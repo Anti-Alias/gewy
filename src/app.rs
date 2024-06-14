@@ -1,8 +1,8 @@
 use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::window::WindowId;
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::window::{self, WindowId};
 use crate::{GewyWindow, GewyWindowId, GewyWindowState};
 
 /// Application that displays a gewy UI in a single winit window.
@@ -24,7 +24,9 @@ impl GewyApp {
         }
     }
 
-    pub fn add_window(&mut self, window_state: GewyWindowState) -> GewyWindowId {
+    pub fn add_window(&mut self, mut window_state: GewyWindowState) -> GewyWindowId {
+        let root_id = window_state.node_tree.root_id();
+        window_state.node_tree.render(root_id);
         self.window_states.push(window_state);
         let id = GewyWindowId(self.window_sequence);
         self.window_sequence += 1;
@@ -33,7 +35,9 @@ impl GewyApp {
 
     /// Starts the application. Blocks until closed.
     pub fn start(mut self) {
+        if self.window_states.is_empty() { return }
         let event_loop = EventLoop::new().unwrap();
+        event_loop.set_control_flow(ControlFlow::Poll);
         event_loop.run_app(&mut self).unwrap();
     }
 
@@ -81,8 +85,12 @@ impl ApplicationHandler for GewyApp {
         log::trace!("Handling window event: {event:?}");
         let Some((window, window_state)) = self.get_window_mut(window_id) else { return };
         match event {
-            WindowEvent::Resized(size) => window.resize(size.width, size.height),
-            WindowEvent::RedrawRequested => window.draw(&window_state),
+            WindowEvent::Resized(size) => {
+                window.resize(size.width, size.height);
+                window_state.node_tree.compute_layout_root(size.width as f32, size.height as f32);
+                window.window.request_redraw();
+            },
+            WindowEvent::RedrawRequested => window.paint(&window_state),
             WindowEvent::CloseRequested => self.remove_window(window_id, event_loop),
             _ => {}
         }

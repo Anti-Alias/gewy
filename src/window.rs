@@ -2,13 +2,14 @@ use std::num::NonZeroUsize;
 use std::pin::Pin;
 
 use pollster::block_on;
-use vello::kurbo::{Affine, Circle};
-use vello::peniko::{Color, Fill};
+use vello::peniko::Color;
 use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wgpu::{Adapter, CompositeAlphaMode, Device, DeviceDescriptor, Instance, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureUsages};
 use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
+
+use crate::{NodeTree, Widget};
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug, PartialOrd, Ord, Hash)]
 pub struct GewyWindowId(pub(crate) u64);
@@ -55,25 +56,7 @@ impl GewyWindow {
             antialiasing_support: AaSupport::all(),
             num_init_threads: NonZeroUsize::new(1),
         }).unwrap();
-        let mut scene = Scene::new();
-        scene.fill(
-            Fill::NonZero,
-            Affine::IDENTITY,
-            Color::rgb8(242, 140, 168),
-            None,
-            &Circle::new((420.0, 200.0), 120.0),
-        );
-
-        Self {
-            device,
-            queue,
-            surface,
-            surface_config,
-            window,
-            renderer,
-            scene,
-
-        }
+        Self { device, queue, surface, surface_config, window, renderer, scene: Scene::new() }
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -82,8 +65,10 @@ impl GewyWindow {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn draw(&mut self, state: &GewyWindowState) {
+    pub fn paint(&mut self, state: &GewyWindowState) {
         let Ok(surface_texture) = self.surface.get_current_texture() else { return };
+        self.scene.reset();
+        state.node_tree.paint_root(&mut self.scene);
         self.renderer.render_to_surface(
             &self.device,
             &self.queue,
@@ -101,17 +86,18 @@ impl GewyWindow {
 }
 
 /// Logical state of a [`GewyWindow`].
-#[derive(Debug)]
 pub struct GewyWindowState {
-    pub width: u32,
-    pub height: u32,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) node_tree: NodeTree,
 }
 
-impl Default for GewyWindowState {
-    fn default() -> Self {
+impl GewyWindowState {
+    pub fn new(width: u32, height: u32, widget: impl Widget) -> Self {
         Self {
-            width: 512,
-            height: 512,
+            width,
+            height,
+            node_tree: NodeTree::new(widget),
         }
     }
 }
@@ -130,7 +116,7 @@ fn create_surface_config(
         .expect("No suitable texture format found")
         .clone();
     SurfaceConfiguration {
-        present_mode: PresentMode::Fifo,
+        present_mode: PresentMode::Mailbox,
         format,
         view_formats: vec![],
         usage: TextureUsages::RENDER_ATTACHMENT,
