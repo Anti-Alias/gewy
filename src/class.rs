@@ -5,12 +5,24 @@
  */
 pub trait Class<W> {
     fn apply(&self, widget: &mut W);
+    fn to_widget(&self) -> W
+    where
+        W: Default
+    {
+        let mut widget = W::default();
+        self.apply(&mut widget);
+        widget
+    }
 }
 
 impl<W, F: Fn(&mut W)> Class<W> for F {
     fn apply(&self, widget: &mut W) {
         self(widget);
     }
+}
+
+impl<W> Class<W> for () {
+    fn apply(&self, _widget: &mut W) {}
 }
 
 impl<W, C0: Class<W>> Class<W> for (C0,) {

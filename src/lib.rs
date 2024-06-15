@@ -1,14 +1,18 @@
 mod app;
 mod window;
 mod ui;
-mod widgets;
 mod class;
+mod string;
+mod font;
+mod widgets;
 
 pub use app::*;
 pub use window::*;
 pub use ui::*;
-pub use widgets::*;
 pub use class::*;
+pub use string::*;
+pub use font::*;
+pub use widgets::*;
 
 // Re-exports
 pub use taffy as layout;

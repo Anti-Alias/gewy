@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 use vello::Scene;
 
-use crate::{NodeId, NodeTree};
+use crate::{FontDB, NodeId, NodeTree};
 use crate::layout::{Style, Layout};
 use crate::geom::Affine;
 
@@ -11,9 +11,7 @@ use crate::geom::Affine;
 pub trait Widget: 'static {
 
     /// [`Style`] used for layout.
-    fn style(&self) -> Style {
-        Style::default()
-    }
+    fn style(&self, style: &mut Style) {}
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.
@@ -34,23 +32,30 @@ pub struct UIRenderer<'a> {
     current: NodeId,                    // "Current" widget. Calls to insert() will append children to this widget.
     last: Option<NodeId>,               // "Last" widget inserted as a child of the "current" widget.
     ancestors: SmallVec<[NodeId; 8]>,   // Stack of ancestors to the "current" widget. Can include parent, grandparent, etc. If empty, calls to end() will panic.
+    font_db: &'a FontDB,
 }
 
 impl<'a> UIRenderer<'a> {
-    pub(crate) fn new(node_tree: &'a mut NodeTree, starting_node: NodeId) -> Self {
+    pub(crate) fn new(
+        node_tree: &'a mut NodeTree,
+        starting_node: NodeId,
+        font_db: &'a FontDB,
+    ) -> Self {
         Self {
             node_tree,
             current: starting_node,
             last: None,
             ancestors: SmallVec::new(),
+            font_db,
         }
     }
 
     /// Inserts a widget node as a child of the "current" node.
     /// The inserted widget is considered the "last" node.
-    pub fn insert(&mut self, widget: impl Widget) {
+    pub fn insert(&mut self, widget: impl Widget) -> NodeId {
         let node_id = self.node_tree.insert(widget, self.current).unwrap();
         self.last = Some(node_id);
+        node_id
     }
 
     /// Sets the "current" [`Widget`] to the last one inserted.
@@ -74,6 +79,11 @@ impl<'a> UIRenderer<'a> {
         };
         self.current = parent;
         self.last = None;
+    }
+
+    /// A database of fonts to be queried during [`Widget`] construction.
+    pub fn font_db(&self) -> &FontDB {
+        &self.font_db
     }
 }
 

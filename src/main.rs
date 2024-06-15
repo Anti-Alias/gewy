@@ -1,30 +1,43 @@
+use std::path::Path;
+
 use gewy::geom::RoundedRectRadii;
-use gewy::paint::Color;
-use gewy::{begin, div, end, Div, GewyApp, GewyWindowState, UIRenderer, Widget};
+use gewy::paint::{Blob, Color, Font};
+use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyWindowState, Text, UIRenderer, Widget};
 use gewy::layout::*;
 
 fn main() {
     env_logger::init();
-    let mut app = GewyApp::new();
+
+    // Loads fonts
+    let default_font = load_font("assets/fonts/arial.ttf").unwrap();
+    let font_db = FontDB::new(default_font);
+
+    // Starts app
+    let mut app = GewyApp::new(font_db);
     app.add_window(GewyWindowState::new(512, 512, AppWidget));
     app.start();
+}
+
+fn load_font(path: impl AsRef<Path>) -> Result<Font, std::io::Error> {
+    let bytes = std::fs::read(path)?;
+    let bytes = Blob::from(bytes);
+    Ok(Font::new(bytes, 0))
 }
 
 
 struct AppWidget;
 impl Widget for AppWidget {
 
-    fn style(&self) -> Style {
-        let mut style = Style::default();
-        style.size.width = Dimension::Percent(1.0);
-        style.size.height = Dimension::Percent(1.0);
-        style.flex_direction = FlexDirection::Column;
-        style.justify_content = Some(JustifyContent::SpaceAround);
-        style.align_items = Some(AlignItems::Center);
-        style
+    fn style(&self, s: &mut Style) {
+        s.size.width = Dimension::Percent(1.0);
+        s.size.height = Dimension::Percent(1.0);
+        s.flex_direction = FlexDirection::Column;
+        s.justify_content = Some(JustifyContent::Center);
+        s.align_items = Some(AlignItems::Center);
     }
 
     fn render(&self, r: &mut UIRenderer) {
+        text("This is some text!", c_text, r);
         div((c_round, c_red), r);
         div(c_gray, r); begin(r);
             div((c_round, c_green), r);
@@ -32,6 +45,10 @@ impl Widget for AppWidget {
         end(r);
         div((c_round, c_blue), r);
     }
+}
+
+fn c_text(t: &mut Text) {
+    t.width = Some(64.0);
 }
 
 fn c_round(d: &mut Div) {

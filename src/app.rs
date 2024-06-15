@@ -3,7 +3,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
-use crate::{GewyWindow, GewyWindowId, GewyWindowState};
+use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowState};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct GewyApp {
@@ -11,22 +11,24 @@ pub struct GewyApp {
     window_states: Vec<GewyWindowState>,    // Parallel with 'windows'.
     windows: Vec<GewyWindow>,
     window_sequence: u64,
+    font_db: FontDB,
 }
 
 impl GewyApp {
     
-    pub fn new() -> Self {
+    pub fn new(font_db: FontDB) -> Self {
         Self {
             instance: Instance::new(InstanceDescriptor::default()),
             window_states: vec![],
             windows: vec![],
             window_sequence: 0,
+            font_db,
         }
     }
 
     pub fn add_window(&mut self, mut window_state: GewyWindowState) -> GewyWindowId {
         let root_id = window_state.node_tree.root_id();
-        window_state.node_tree.render(root_id);
+        window_state.node_tree.render(root_id, &self.font_db);
         self.window_states.push(window_state);
         let id = GewyWindowId(self.window_sequence);
         self.window_sequence += 1;

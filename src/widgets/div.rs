@@ -1,4 +1,4 @@
-use crate::{Class, Scene, UIRenderer, Widget};
+use crate::{Class, NodeId, Scene, UIRenderer, Widget};
 use crate::layout::{Style, Layout};
 use crate::paint::{Color, Fill};
 use crate::geom::{Affine, RoundedRect, RoundedRectRadii};
@@ -12,8 +12,8 @@ pub struct Div {
 
 impl Widget for Div {
 
-    fn style(&self) -> Style {
-        self.style.clone()
+    fn style(&self, style: &mut Style) {
+        *style = self.style.clone();
     }
 
     #[allow(unused)]
@@ -33,8 +33,6 @@ impl Widget for Div {
 }
 
 /// Widget function for [`Div`].
-pub fn div(class: impl Class<Div>, r: &mut UIRenderer) {
-    let mut div = Div::default();
-    class.apply(&mut div);
-    r.insert(div);
+pub fn div(class: impl Class<Div>, r: &mut UIRenderer) -> NodeId {
+    r.insert(class.to_widget())
 }

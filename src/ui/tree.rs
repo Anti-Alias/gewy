@@ -2,7 +2,8 @@ use slotmap::SlotMap;
 use smallvec::SmallVec;
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
-use crate::{UIRenderer, Widget, Scene};
+use crate::{FontDB, Scene, UIRenderer, Widget};
+use crate::layout::Style;
 
 
 /// A scene graph of [`Widget`]s.
@@ -16,9 +17,10 @@ pub struct NodeTree {
 impl NodeTree {
 
     pub fn new(root_widget: impl Widget) -> Self {
+        let root_widget_style = style_of(&root_widget);
         let mut nodes = SlotMap::default();
         let mut taffy_tree = TaffyTree::new();
-        let taffy_root_id = taffy_tree.new_leaf(root_widget.style()).unwrap();
+        let taffy_root_id = taffy_tree.new_leaf(root_widget_style).unwrap();
         let root_id = nodes.insert(Node::root(root_widget, taffy_root_id));
         Self { root_id, nodes, taffy_tree }
     }
@@ -34,7 +36,8 @@ impl NodeTree {
     }
 
     pub fn insert(&mut self, widget: impl Widget, parent_id: NodeId) -> Option<NodeId> {
-        let taffy_node_id = self.taffy_tree.new_leaf(widget.style()).unwrap();
+        let widget_style = style_of(&widget);
+        let taffy_node_id = self.taffy_tree.new_leaf(widget_style).unwrap();
         let node_id = self.nodes.insert(Node::new(widget, parent_id, taffy_node_id));
         let Some(parent) = self.nodes.get_mut(parent_id) else {
             self.nodes.remove(node_id);
@@ -88,13 +91,13 @@ impl NodeTree {
     }
 
     /// Clears the descendants of a [`Widget`] (if any), then renders them.
-    pub(crate) fn render(&mut self, node_id: NodeId) {
+    pub(crate) fn render(&mut self, node_id: NodeId, font_db: &FontDB) {
         self.remove_children(node_id);
         let Some(node) = self.nodes.get_mut(node_id) else { return };
         let node: &mut Node = unsafe {
             std::mem::transmute(node)   // Safety: Render method only has access to descendants of this node.
         };
-        let mut renderer = UIRenderer::new(self, node_id);
+        let mut renderer = UIRenderer::new(self, node_id, font_db);
         node.widget.render(&mut renderer);
     }
 
@@ -128,6 +131,12 @@ impl NodeTree {
         };
         self.taffy_tree.compute_layout(node.taffy_node_id, space).unwrap();
     }
+}
+
+fn style_of(widget: &dyn Widget) -> Style {
+    let mut result = Style::default();
+    widget.style(&mut result);
+    result
 }
 
 
