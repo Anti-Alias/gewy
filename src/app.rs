@@ -2,7 +2,7 @@ use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{self, WindowId};
+use winit::window::WindowId;
 use crate::{GewyWindow, GewyWindowId, GewyWindowState};
 
 /// Application that displays a gewy UI in a single winit window.

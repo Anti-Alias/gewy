@@ -1,6 +1,7 @@
 use slotmap::SlotMap;
 use smallvec::SmallVec;
 use taffy::{AvailableSpace, Layout, Size, TaffyTree};
+use vello::kurbo::{Affine, Vec2};
 use crate::{UIRenderer, Widget, Scene};
 
 
@@ -105,15 +106,20 @@ impl NodeTree {
     }
 
     pub(crate) fn paint_root(&self, scene: &mut Scene) {
-        self.paint(self.root_id, scene);
+        self.paint(self.root_id, scene, Affine::IDENTITY);
     }
 
-    pub(crate) fn paint(&self, node_id: NodeId, scene: &mut Scene) {
+    pub(crate) fn paint(&self, node_id: NodeId, scene: &mut Scene, mut affine: Affine) {
+        // Paints widget
         let node = self.nodes.get(node_id).unwrap();
         let node_layout = self.taffy_tree.layout(node.taffy_node_id).unwrap();
-        node.widget.paint(scene, node_layout);
+        node.widget.paint(scene, node_layout, affine);
+        if node.children_ids.is_empty() { return };
+        // Paints children
+        let transl = Vec2::new(node_layout.location.x as f64, node_layout.location.y as f64);
+        affine = affine.then_translate(transl);
         for child_id in &node.children_ids {
-            self.paint(*child_id, scene);
+            self.paint(*child_id, scene, affine);
         }
     }
 

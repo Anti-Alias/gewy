@@ -3,14 +3,24 @@ use vello::Scene;
 
 use crate::{NodeId, NodeTree};
 use crate::layout::{Style, Layout};
+use crate::geom::Affine;
 
 /// A paintable UI element in a [`NodeTree`].
 /// For instance, a text element, a div, a button etc.
 /// Wrapped in a [`Node`] when inserted in a [`NodeTree`] which grants it parent/child relationships with other [`Widget`]s in the tree.
 pub trait Widget: 'static {
-    fn style(&self) -> Style { Style::default() }
+
+    /// [`Style`] used for layout.
+    fn style(&self) -> Style {
+        Style::default()
+    }
+
+    /// Paints this [`Widget`] onto a [`Scene`].
+    /// Does not paint descendants.
     #[allow(unused)]
-    fn paint(&self, scene: &mut Scene, layout: &Layout) {}
+    fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {}
+
+    /// Renders descendant [`Widget`]s.
     #[allow(unused)]
     fn render(&self, r: &mut UIRenderer) {}
 }

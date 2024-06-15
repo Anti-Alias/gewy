@@ -1,11 +1,9 @@
-use taffy::Size;
-use vello::kurbo::RoundedRectRadii;
-
-use crate::{Widget, Scene, UIRenderer};
+use crate::{Class, Scene, UIRenderer, Widget};
 use crate::layout::{Style, Layout};
 use crate::paint::{Color, Fill};
-use crate::geom::{Affine, RoundedRect};
+use crate::geom::{Affine, RoundedRect, RoundedRectRadii};
 
+#[derive(Default, Debug)]
 pub struct Div {
     pub style: Style,
     pub color: Color,
@@ -14,11 +12,12 @@ pub struct Div {
 
 impl Widget for Div {
 
-    fn style(&self) -> Style { self.style.clone() }
+    fn style(&self) -> Style {
+        self.style.clone()
+    }
 
     #[allow(unused)]
-    fn paint(&self, scene: &mut Scene, layout: &Layout) {
-        println!("{layout:#?}");
+    fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {
         let rect = RoundedRect::new(
             layout.location.x as f64,
             layout.location.y as f64,
@@ -26,20 +25,16 @@ impl Widget for Div {
             (layout.location.y + layout.size.height) as f64,
             self.radii,
         );
-        scene.fill(Fill::NonZero, Affine::IDENTITY, self.color, None, &rect);
+        scene.fill(Fill::NonZero, affine, self.color, None, &rect);
     }
 
     #[allow(unused)]
     fn render(&self, r: &mut UIRenderer) {}
 }
 
-pub fn div(width: f32, height: f32, r: &mut UIRenderer) {
-    r.insert(Div {
-        style: Style {
-            size: Size::from_lengths(width, height),
-            ..Default::default()
-        },
-        color: Color::RED,
-        radii: RoundedRectRadii::from_single_radius(3.0),
-    });
+/// Widget function for [`Div`].
+pub fn div(class: impl Class<Div>, r: &mut UIRenderer) {
+    let mut div = Div::default();
+    class.apply(&mut div);
+    r.insert(div);
 }
