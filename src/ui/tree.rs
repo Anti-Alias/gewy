@@ -1,20 +1,16 @@
 use slotmap::SlotMap;
 use smallvec::SmallVec;
-use taffy::{AvailableSpace, Layout, Size, TaffyTree};
+use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
 use crate::{UIRenderer, Widget, Scene};
 
 
-/**
- * A scene graph of [`Node`]s containing [`Widget`]s.
- * Every inserted [`Widget`] is wrapped in a node which contains parent-child information
- * useful for navigating through the tree.
- * This tree structure 
- */
+/// A scene graph of [`Widget`]s.
+/// Every inserted [`Widget`] is wrapped in a [`Node`] which parent/child metadata.
 pub struct NodeTree {
     root_id: NodeId,
     nodes: SlotMap<NodeId, Node>,
-    taffy_tree: TaffyTree,          // Mirrors the tree. Used for layout.
+    taffy_tree: TaffyTree,
 }
 
 impl NodeTree {
@@ -24,11 +20,7 @@ impl NodeTree {
         let mut taffy_tree = TaffyTree::new();
         let taffy_root_id = taffy_tree.new_leaf(root_widget.style()).unwrap();
         let root_id = nodes.insert(Node::root(root_widget, taffy_root_id));
-        Self {
-            root_id,
-            nodes,
-            taffy_tree,
-        }
+        Self { root_id, nodes, taffy_tree }
     }
 
     pub fn root_id(&self) -> NodeId { self.root_id }
@@ -47,6 +39,7 @@ impl NodeTree {
         let Some(parent) = self.nodes.get_mut(parent_id) else {
             self.nodes.remove(node_id);
             self.taffy_tree.remove(taffy_node_id).unwrap();
+
             return None;
         };
         self.taffy_tree.add_child(parent.taffy_node_id, taffy_node_id).unwrap();
@@ -123,15 +116,6 @@ impl NodeTree {
         }
     }
 
-    pub(crate) fn compute_root_layout(&mut self, width: f32, height: f32) {
-        let Some(node) = self.nodes.get(self.root_id) else { return };
-        let space = Size {
-            width: AvailableSpace::Definite(width),
-            height: AvailableSpace::Definite(height),
-        };
-        self.taffy_tree.compute_layout(node.taffy_node_id, space).unwrap();
-    }
-
     pub(crate) fn compute_layout_root(&mut self, width: f32, height: f32) {
         self.compute_layout(self.root_id, width, height);
     }
@@ -143,12 +127,6 @@ impl NodeTree {
             height: AvailableSpace::Definite(height),
         };
         self.taffy_tree.compute_layout(node.taffy_node_id, space).unwrap();
-    }
-
-    pub(crate) fn layout(&self, node_id: NodeId) -> Option<&Layout> {
-        self.nodes
-            .get(node_id)
-            .map(|node| self.taffy_tree.layout(node.taffy_node_id).unwrap())
     }
 }
 
