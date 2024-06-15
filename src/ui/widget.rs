@@ -11,6 +11,7 @@ use crate::geom::Affine;
 pub trait Widget: 'static {
 
     /// [`Style`] used for layout.
+    #[allow(unused)]
     fn style(&self, style: &mut Style) {}
 
     /// Paints this [`Widget`] onto a [`Scene`].

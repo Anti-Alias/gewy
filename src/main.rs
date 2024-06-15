@@ -1,5 +1,4 @@
 use std::path::Path;
-
 use gewy::geom::RoundedRectRadii;
 use gewy::paint::{Blob, Color, Font};
 use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyWindowState, Text, UIRenderer, Widget};

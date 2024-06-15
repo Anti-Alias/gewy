@@ -116,7 +116,7 @@ fn create_surface_config(
         .expect("No suitable texture format found")
         .clone();
     SurfaceConfiguration {
-        present_mode: PresentMode::Mailbox,
+        present_mode: PresentMode::AutoNoVsync,
         format,
         view_formats: vec![],
         usage: TextureUsages::RENDER_ATTACHMENT,

@@ -1,7 +1,7 @@
 use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::WindowId;
 use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowState};
 
@@ -39,7 +39,6 @@ impl GewyApp {
     pub fn start(mut self) {
         if self.window_states.is_empty() { return }
         let event_loop = EventLoop::new().unwrap();
-        event_loop.set_control_flow(ControlFlow::Poll);
         event_loop.run_app(&mut self).unwrap();
     }
 
@@ -90,7 +89,6 @@ impl ApplicationHandler for GewyApp {
             WindowEvent::Resized(size) => {
                 window.resize(size.width, size.height);
                 window_state.node_tree.compute_layout_root(size.width as f32, size.height as f32);
-                window.window.request_redraw();
             },
             WindowEvent::RedrawRequested => window.paint(&window_state),
             WindowEvent::CloseRequested => self.remove_window(window_id, event_loop),
