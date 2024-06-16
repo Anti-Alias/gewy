@@ -74,7 +74,6 @@ impl Widget for Text {
     }
 
     fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {
-
         {
             let rect = RoundedRect::new(
                 layout.location.x as f64,

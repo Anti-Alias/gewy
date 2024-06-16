@@ -131,9 +131,13 @@ impl NodeTree {
             width: AvailableSpace::Definite(width),
             height: AvailableSpace::Definite(height),
         };
-        self.taffy_tree.compute_layout(node.taffy_node_id, space).unwrap();
+        self.taffy_tree.compute_layout_with_measure(node.taffy_node_id, space, |size, size_available, taffy_node_id, node_content, style| {
+            Size::ZERO
+        }).unwrap();
         self.inform_layout_changes(node_id);
     }
+
+    // FnMut(Size<Option<f32>>, Size<AvailableSpace>, NodeId, Option<&mut NodeContext>, &Style) -> Size<f32>
 
     fn inform_layout_changes(&mut self, node_id: NodeId) {
         let node = self.nodes.get_mut(node_id).unwrap();
