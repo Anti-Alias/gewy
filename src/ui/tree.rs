@@ -67,14 +67,8 @@ impl NodeTree {
     pub fn remove_children(&mut self, id: WidgetId) {
         let Ok(children_ids) = self.widgets.children(id.0) else { return };
         for child_id in children_ids {
-            self.widgets.remove(child_id);
+            self.widgets.remove(child_id).unwrap();
         }
-    }
-
-    // Internal recursive removal function.
-    // Does not delink from parent as it assumes its parent, if any, has already been removed.
-    fn remove_child(&mut self, node_id: WidgetId) {
-        self.widgets.remove(node_id.0);
     }
 
     pub fn len(&self) -> usize {
@@ -120,13 +114,13 @@ impl NodeTree {
     /// Computes the layout of the node specified recursively.
     /// Then, informs the [`Widget`] of each node of the layout change recursively.
     pub(crate) fn compute_layout(&mut self, id: WidgetId, width: f32, height: f32) {
-        let Some(widget) = self.widgets.get_node_context(id.0) else { return };
         let space = Size {
             width: AvailableSpace::Definite(width),
             height: AvailableSpace::Definite(height),
         };
-        self.widgets.compute_layout_with_measure(id.0, space, |size, size_available, node_id, node_content, style| {
-            Size::ZERO
+        self.widgets.compute_layout_with_measure(id.0, space, |size, size_available, _, widget, _| {
+            let widget = widget.unwrap();
+            widget.measure(size, size_available)
         }).unwrap();
         self.inform_layout_changes(id);
     }

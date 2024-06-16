@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 use vello::Scene;
 
 use crate::{FontDB, WidgetId, NodeTree};
-use crate::layout::{Style, Layout};
+use crate::layout::{Style, Layout, Size, AvailableSpace};
 use crate::geom::Affine;
 
 /// A paintable UI element in a [`NodeTree`].
@@ -13,6 +13,10 @@ pub trait Widget: 'static {
     /// [`Style`] used for computing layouts.
     #[allow(unused)]
     fn style(&self, style: &mut Style) {}
+
+    fn measure(&self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
+        Size::ZERO
+    }
 
     /// Invoked when a [`Widget`] finishes computing its layout.
     /// Same value is passed into paint().
