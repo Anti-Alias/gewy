@@ -55,7 +55,7 @@ impl Widget for AppWidget {
         div(c_gray, r);                     // Inserts div. Configured with 1 class (c_gray).
         begin(r);                           // Causes subsequent inserts to be children of the last widget inserted (in this case, it was a "div").
             div((c_round, c_green), r);     // Inserts div 
-            text("This", c_text, r);        // Inserts text
+            text("Line 1\nThis line 2\nLine 3", c_text, r);        // Inserts text
             div((c_round, c_yellow), r);    // Inserts div
         end(r);                             // Causes subsequent inserts to move back to the parent widget (in this case, it's the AppWidget).
         div((c_round, c_blue), r);          // Inserts div.

@@ -57,7 +57,7 @@ impl Widget for Text {
         match self.text_align {
             TextAlign::Left => {},
             TextAlign::Right => lines.align_right(layout.size.width),
-            TextAlign::Center => lines.align_center(layout.size.height),
+            TextAlign::Center => lines.align_center(layout.size.width),
         }
         self._glyphs = lines.glyphs;
     }
@@ -83,11 +83,15 @@ impl Widget for Text {
                 (layout.location.y + layout.size.height) as f64,
                 RoundedRectRadii::from_single_radius(0.0),
             );
-            scene.fill(Fill::NonZero, affine, Color::PINK, None, &rect);
+            scene.fill(Fill::NonZero, affine, Color::BLACK, None, &rect);
         }
 
-        let affine = affine.then_translate(Vec2::new(layout.location.x as f64, layout.location.y as f64));
         let font = self._font.as_ref().unwrap();
+        let affine = {
+            let line_height = self.line_height * self.font.size as f32;
+            let position = Vec2::new(layout.location.x as f64, (layout.location.y + line_height) as f64);
+            affine.then_translate(position)
+        };
         scene
             .draw_glyphs(font)
             .brush(&Brush::Solid(self.color))
