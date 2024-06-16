@@ -38,11 +38,11 @@ impl Widget for AppWidget {
     /// [`Widget`]s must provide a [`Style`], which is comparable to styles in css.
     /// Unlike css, [`Style`]s in [`gewy`] contain only layout information.
     fn style(&self, s: &mut Style) {
-        s.size.width = Dimension::Percent(1.0);
-        s.size.height = Dimension::Percent(1.0);
-        s.flex_direction = FlexDirection::Column;
-        s.justify_content = Some(JustifyContent::Center);
-        s.align_items = Some(AlignItems::Center);
+        s.size.width = Dimension::Percent(1.0);             // Width is 100% of its parent (in this case, the window).
+        s.size.height = Dimension::Percent(1.0);            // Height is 100% of its parent (in this case, the window).
+        s.flex_direction = FlexDirection::Column;           // Main axis is top-to-bottom.
+        s.justify_content = Some(JustifyContent::Center);   // Content on main axis is centered.
+        s.align_items = Some(AlignItems::Center);           // Content on cross axis is centered.
     }
 
     /// A UIRenderer is used to build the DOM tree underneath this [`Widget`].
@@ -51,14 +51,14 @@ impl Widget for AppWidget {
     /// Some privimitive [`Widget`]s like divs allow for their [`Style`]s to be externally configured via class callback functions (or tuples of these).
     /// Most higher level [`Widget`]s do not provide this functionality, however.
     fn render(&self, r: &mut UIRenderer) {
-        div((c_round, c_red), r);           // Inserts div with no children. Configured with 2 classes (c_round, c_red).
+        div((c_round, c_red), r);           // Inserts div. Configured with 2 classes (c_round, c_red).
         div(c_gray, r);                     // Inserts div. Configured with 1 class (c_gray).
         begin(r);                           // Causes subsequent inserts to be children of the last widget inserted (in this case, it was a "div").
-            div((c_round, c_green), r);     // Inserts div with no children. 
-            text("This", c_text, r);        // Inserts text. Configured with 2 classes (c_round, c_yellow).
-            div((c_round, c_yellow), r);    // Insrts div with no children
+            div((c_round, c_green), r);     // Inserts div 
+            text("This", c_text, r);        // Inserts text
+            div((c_round, c_yellow), r);    // Inserts div
         end(r);                             // Causes subsequent inserts to move back to the parent widget (in this case, it's the AppWidget).
-        div((c_round, c_blue), r);          // Inserts div with no children. Configured with 2 classes (c_round, c_blue).
+        div((c_round, c_blue), r);          // Inserts div.
     }
 }
 
