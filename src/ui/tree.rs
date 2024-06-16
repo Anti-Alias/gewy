@@ -123,6 +123,8 @@ impl NodeTree {
         self.compute_layout(self.root_id, width, height);
     }
 
+    /// Computes the layout of the node specified recursively.
+    /// Then, informs the [`Widget`] of each node of the layout change recursively.
     pub(crate) fn compute_layout(&mut self, node_id: NodeId, width: f32, height: f32) {
         let Some(node) = self.nodes.get(node_id) else { return };
         let space = Size {
@@ -130,6 +132,19 @@ impl NodeTree {
             height: AvailableSpace::Definite(height),
         };
         self.taffy_tree.compute_layout(node.taffy_node_id, space).unwrap();
+        self.inform_layout_changes(node_id);
+    }
+
+    fn inform_layout_changes(&mut self, node_id: NodeId) {
+        let node = self.nodes.get_mut(node_id).unwrap();
+        let node_layout = self.taffy_tree.layout(node.taffy_node_id).unwrap();
+        node.widget.layout(node_layout);
+        let children: &[NodeId] = unsafe {
+            std::mem::transmute(node.children_ids.as_ref())
+        };
+        for child_id in children {
+            self.inform_layout_changes(*child_id);
+        }
     }
 }
 

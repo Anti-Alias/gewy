@@ -10,9 +10,14 @@ use crate::geom::Affine;
 /// Wrapped in a [`Node`] when inserted in a [`NodeTree`] which grants it parent/child relationships with other [`Widget`]s in the tree.
 pub trait Widget: 'static {
 
-    /// [`Style`] used for layout.
+    /// [`Style`] used for computing layouts.
     #[allow(unused)]
     fn style(&self, style: &mut Style) {}
+
+    /// Invoked when a [`Widget`] finishes computing its layout.
+    /// Same value is passed into paint().
+    #[allow(unused)]
+    fn layout(&mut self, layout: &Layout) {}
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.

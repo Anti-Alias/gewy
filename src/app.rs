@@ -1,17 +1,17 @@
+use slotmap::SlotMap;
 use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::WindowId;
-use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowState};
+use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowView, Late};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct GewyApp {
     instance: Instance,
-    window_states: Vec<GewyWindowState>,    // Parallel with 'windows'.
-    windows: Vec<GewyWindow>,
-    window_sequence: u64,
+    windows: SlotMap<GewyWindowId, GewyWindow>,    // Parallel with 'windows'.
     font_db: FontDB,
+    event_handler: Option<Box<dyn FnMut(AppEvent)>>,
 }
 
 impl GewyApp {
@@ -19,50 +19,49 @@ impl GewyApp {
     pub fn new(font_db: FontDB) -> Self {
         Self {
             instance: Instance::new(InstanceDescriptor::default()),
-            window_states: vec![],
-            windows: vec![],
-            window_sequence: 0,
+            windows: SlotMap::default(),
             font_db,
+            event_handler: None,
         }
     }
 
-    pub fn add_window(&mut self, mut window_state: GewyWindowState) -> GewyWindowId {
-        let root_id = window_state.node_tree.root_id();
-        window_state.node_tree.render(root_id, &self.font_db);
-        self.window_states.push(window_state);
-        let id = GewyWindowId(self.window_sequence);
-        self.window_sequence += 1;
-        id
+    /// Adds a Window to the app.
+    /// Window will appear once the app starts.
+    pub fn add_window(&mut self, mut window: GewyWindow) -> GewyWindowId {
+        let root_id = window.node_tree.root_id();
+        window.node_tree.render(root_id, &self.font_db);
+        self.windows.insert(window)
+    }
+
+    /// Removes a window from the app.
+    /// Window will not appear when the app starts.
+    pub fn remove_window(&mut self, window_id: GewyWindowId) -> Option<GewyWindow> {
+        self.windows.remove(window_id)
     }
 
     /// Starts the application. Blocks until closed.
     pub fn start(mut self) {
-        if self.window_states.is_empty() { return }
+        if self.windows.is_empty() { return }
         let event_loop = EventLoop::new().unwrap();
         event_loop.run_app(&mut self).unwrap();
     }
 
-    fn get_window_mut(&mut self, window_id: WindowId) -> Option<(&mut GewyWindow, &mut GewyWindowState)> {
-        for i in 0..self.windows.len() {
-            if self.windows[i].window.id() == window_id {
-                let window = &mut self.windows[i];
-                let window_state = &mut self.window_states[i];
-                return Some((window, window_state));
-            }
-        }
-        None
+    /// Gets mutable [`GewyWindowView`] using winit window id.
+    fn get_window_winit_mut(&mut self, winit_window_id: WindowId) -> Option<&mut GewyWindow> {
+        self.windows.values_mut().find(|window| {
+            let current_id = window.view.as_ref().unwrap().winit_window_id();
+            current_id == winit_window_id
+        })
     }
 
-    fn remove_window(&mut self, window_id: WindowId, event_loop: &ActiveEventLoop) {
-        for i in 0..self.windows.len() {
-            if self.windows[i].window.id() == window_id {
-                self.windows.remove(i);
-                self.window_states.remove(i);
-                if self.window_states.is_empty() {
-                    event_loop.exit();
-                }
-                return;
-            }
+    /// Removes a [`GewyWindowView`] / [`GewyWindow`] pair using winit window id.
+    fn remove_window_view(&mut self, winit_window_id: WindowId, event_loop: &ActiveEventLoop) {
+        self.windows.retain(|_, window| {
+            let current_id = window.view.as_ref().unwrap().winit_window_id();
+            current_id == winit_window_id
+        });
+        if self.windows.is_empty() {
+            event_loop.exit();
         }
     }
 }
@@ -70,11 +69,14 @@ impl GewyApp {
 impl ApplicationHandler for GewyApp {
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.windows = self.window_states
-            .iter()
-            .map(|window_state| GewyWindow::new(&self.instance, window_state, event_loop))
-            .collect();
-        log::info!("Window state created");
+        for window in self.windows.values_mut() {
+            window.view = Late::Init(GewyWindowView::new(
+                &self.instance,
+                window.content_width,
+                window.content_height, event_loop
+            ));
+        }
+        log::info!("{} window state created", self.windows.len());
     }
 
     fn window_event(
@@ -84,15 +86,36 @@ impl ApplicationHandler for GewyApp {
         event: winit::event::WindowEvent,
     ) {
         log::trace!("Handling window event: {event:?}");
-        let Some((window, window_state)) = self.get_window_mut(window_id) else { return };
+        let Some(window) = self.get_window_winit_mut(window_id) else { return };
+        let window_view = window.view.as_mut().unwrap();
         match event {
             WindowEvent::Resized(size) => {
-                window.resize(size.width, size.height);
-                window_state.node_tree.compute_layout_root(size.width as f32, size.height as f32);
+                window_view.resize(size.width, size.height);
+                window.node_tree.compute_layout_root(size.width as f32, size.height as f32);
             },
-            WindowEvent::RedrawRequested => window.paint(&window_state),
+            WindowEvent::RedrawRequested => window_view.paint(&window),
             WindowEvent::CloseRequested => self.remove_window(window_id, event_loop),
             _ => {}
         }
     }
+}
+
+
+
+/// Allows for interaction with the [`GewyApp`] as it runs.
+/// Can create and destroy windows.
+pub struct GewyContext<'a> {
+    app: &'a mut GewyApp,
+}
+
+impl<'a> GewyContext<'a> {
+    fn add_window(&mut self, mut window_state: GewyWindow) -> GewyWindowId {
+        self.app.add_window(window_state)
+    }
+}
+
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum AppEvent {
+    Start,
 }

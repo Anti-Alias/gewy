@@ -1,12 +1,10 @@
-use std::str::Chars;
-
 use taffy::Dimension;
 use vello::glyph::skrifa::charmap::Charmap;
 use vello::glyph::skrifa::instance::Size;
 use vello::glyph::skrifa::metrics::GlyphMetrics;
 use vello::glyph::skrifa::{FontRef, MetadataProvider};
 use vello::glyph::Glyph;
-use vello::kurbo::Vec2;
+use vello::kurbo::{RoundedRect, RoundedRectRadii, Vec2};
 use vello::peniko::{Brush, Fill};
 
 use crate::{Class, FontQuery, GewyString, NodeId, Scene, UIRenderer, Widget};
@@ -20,14 +18,12 @@ pub struct Text {
     pub font: FontQuery,
     pub line_height: f32,
     pub color: Color,
-    pub width: Option<f32>,
-    pub height: Option<f32>,
+    pub width: Option<Dimension>,
+    pub height: Option<Dimension>,
     pub text_align: TextAlign,
     pub word_wrap: bool,
-    _glyphs: Vec<Glyph>,
-    _font: Option<Font>,        // Computed font
-    _width: f32,                // Computed width
-    _height: f32,               // Computed height
+    _glyphs: Vec<Glyph>,    // Glyphs computed at layout time
+    _font: Option<Font>,    // Computed font
 }
 
 impl Default for Text {
@@ -43,49 +39,53 @@ impl Default for Text {
             word_wrap: true,
             _glyphs: vec![],
             _font: None,
-            _width: 0.0,
-            _height: 0.0,
         }
-    }
-}
-
-impl Text {
-
-    fn finalize(&mut self, font: Font) {
-        let mut lines = GlyphLines::new(
-            &self.string,
-            &font,
-            self.line_height,
-            self.font.size,
-            self.width.unwrap_or(f32::MAX),
-            self.word_wrap,
-        );
-        let width = self.width.unwrap_or(lines.width);
-        let height = self.height.unwrap_or(lines.height);
-        match self.text_align {
-            TextAlign::Left => {},
-            TextAlign::Right => lines.align_right(width),
-            TextAlign::Center => lines.align_center(width),
-        }
-        self._glyphs = lines.glyphs;
-        self._width = width;
-        self._height = height;
-        self._font = Some(font);
     }
 }
 
 impl Widget for Text {
 
+    fn layout(&mut self, layout: &Layout) {
+        let mut lines = GlyphLines::new(
+            &self.string,
+            self._font.as_ref().unwrap(),
+            self.line_height,
+            self.font.size,
+            layout.size.width,
+            self.word_wrap,
+        );
+        match self.text_align {
+            TextAlign::Left => {},
+            TextAlign::Right => lines.align_right(layout.size.width),
+            TextAlign::Center => lines.align_center(layout.size.height),
+        }
+        self._glyphs = lines.glyphs;
+    }
+
     fn style(&self, style: &mut Style) {
-        style.size.width = Dimension::Length(self._width);
-        style.size.height = Dimension::Length(self._height);
-        style.max_size.width = Dimension::Length(self._width);
-        style.max_size.height = Dimension::Length(self._height);
-        style.min_size.width = Dimension::Length(self._width);
-        style.min_size.height = Dimension::Length(self._height);
+        let width = self.width.unwrap_or(Dimension::Percent(1.0));
+        let height = self.height.unwrap_or(Dimension::Length(64.0));
+        style.size.width = width;
+        style.size.height = height;
+        style.max_size.width = width;
+        style.max_size.height = height;
+        style.min_size.width = width;
+        style.min_size.height = height;
     }
 
     fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {
+
+        {
+            let rect = RoundedRect::new(
+                layout.location.x as f64,
+                layout.location.y as f64,
+                (layout.location.x + layout.size.width) as f64,
+                (layout.location.y + layout.size.height) as f64,
+                RoundedRectRadii::from_single_radius(0.0),
+            );
+            scene.fill(Fill::NonZero, affine, Color::PINK, None, &rect);
+        }
+
         let affine = affine.then_translate(Vec2::new(layout.location.x as f64, layout.location.y as f64));
         let font = self._font.as_ref().unwrap();
         scene
@@ -116,7 +116,7 @@ pub fn text(
     class.apply(&mut text);
     // Finalizes text
     let font = renderer.font_db().query(&text.font).clone();
-    text.finalize(font);
+    text._font = Some(font);
     // Inserts text
     renderer.insert(text)
 }
@@ -130,18 +130,11 @@ fn to_font_ref(font: &Font) -> Option<FontRef<'_>> {
     }
 }
 
-#[derive(Default, Debug)]
-struct LineMeta {
-    index: usize,
-    width: f32,
-}
 
 #[derive(Debug)]
 struct GlyphLines {
     glyphs: Vec<Glyph>,
     line_metas: Vec<LineMeta>,
-    width: f32,
-    height: f32,
 }
 
 impl GlyphLines {
@@ -163,7 +156,6 @@ impl GlyphLines {
         let var_loc = axes.location(variations);
         let charmap = font_ref.charmap();
         let glyph_metrics = font_ref.glyph_metrics(font_size, &var_loc);
-
         if !word_wrap {
             Self::non_wrapping(string, line_height, max_width, &glyph_metrics, &charmap)
         }
@@ -216,35 +208,41 @@ impl GlyphLines {
         let mut y: f32 = 0.0;
         let mut height: f32 = 0.0;
         let mut line_meta = LineMeta { index: 0, width: 0.0 };
+        let mut tokens = string.split(" ").filter(|token| !token.is_empty());
 
-        for (index, c) in string.chars().enumerate() {
-
-            // Get glyph, and move down a line if it overflows
+        // Logic for consuming a character
+        let mut consume_char = |c: char, line_meta: &mut LineMeta, line_metas: &mut Vec<LineMeta>| {
             let gid = charmap.map(c).unwrap_or_default();
             let gid_advance = glyph_metrics.advance_width(gid).unwrap_or_default();
             if c == '\n' || x + gid_advance > max_width {
                 line_meta.width = x;
-                line_metas.push(line_meta);
-                line_meta = LineMeta { index, width: 0.0 };
+                line_metas.push(*line_meta);
+                *line_meta = LineMeta { index: glyphs.len(), width: 0.0 };
                 x = 0.0;
                 y += line_height;
-                if c == '\n' { continue };
+                if c == '\n' { return };
             }
-
-            // Add glyph and advance cursor
             glyphs.push(Glyph { id: gid.to_u16() as u32, x, y });
             height = height.max(y + line_height);
             x += gid_advance;
-        }
+        };
 
+        // Consumes all characters from all tokens.
+        // Places space between each.
+        let mut next_token = tokens.next();
+        while let Some(token) = next_token {
+            for c in token.chars() {
+                consume_char(c, &mut line_meta, &mut line_metas);
+            }
+            next_token = tokens.next();
+            if next_token.is_some() {
+                consume_char(' ', &mut line_meta, &mut line_metas);
+            }
+        }
+        // Finishes
         line_meta.width = x;
         line_metas.push(line_meta);
-
-        let mut width: f32 = 0.0;
-        for line_width in line_metas.iter().map(|meta| meta.width) {
-            width = width.max(line_width);
-        }
-        Self { glyphs, line_metas, width, height }
+        Self { glyphs, line_metas }
     }
 
     fn wrapping(
@@ -256,4 +254,16 @@ impl GlyphLines {
     ) -> Self {
         todo!()
     }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+struct LineMeta {
+    index: usize,
+    width: f32,
+}
+
+#[derive(Default, Debug)]
+struct WordMeta {
+    index: usize,
+    width: f32,
 }
