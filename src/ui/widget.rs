@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 use vello::Scene;
 
-use crate::{FontDB, NodeId, NodeTree};
+use crate::{FontDB, WidgetId, NodeTree};
 use crate::layout::{Style, Layout};
 use crate::geom::Affine;
 
@@ -35,16 +35,16 @@ pub trait Widget: 'static {
 /// Internally, this is writing to a subtree of a [`NodeTree`].
 pub struct UIRenderer<'a> {
     node_tree: &'a mut NodeTree,        // Tree being written to.
-    current: NodeId,                    // "Current" widget. Calls to insert() will append children to this widget.
-    last: Option<NodeId>,               // "Last" widget inserted as a child of the "current" widget.
-    ancestors: SmallVec<[NodeId; 8]>,   // Stack of ancestors to the "current" widget. Can include parent, grandparent, etc. If empty, calls to end() will panic.
+    current: WidgetId,                    // "Current" widget. Calls to insert() will append children to this widget.
+    last: Option<WidgetId>,               // "Last" widget inserted as a child of the "current" widget.
+    ancestors: SmallVec<[WidgetId; 8]>,   // Stack of ancestors to the "current" widget. Can include parent, grandparent, etc. If empty, calls to end() will panic.
     font_db: &'a FontDB,
 }
 
 impl<'a> UIRenderer<'a> {
     pub(crate) fn new(
         node_tree: &'a mut NodeTree,
-        starting_node: NodeId,
+        starting_node: WidgetId,
         font_db: &'a FontDB,
     ) -> Self {
         Self {
@@ -58,7 +58,7 @@ impl<'a> UIRenderer<'a> {
 
     /// Inserts a widget node as a child of the "current" node.
     /// The inserted widget is considered the "last" node.
-    pub fn insert(&mut self, widget: impl Widget) -> NodeId {
+    pub fn insert(&mut self, widget: impl Widget) -> WidgetId {
         let node_id = self.node_tree.insert(widget, self.current).unwrap();
         self.last = Some(node_id);
         node_id

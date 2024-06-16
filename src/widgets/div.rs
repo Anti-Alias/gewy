@@ -1,4 +1,4 @@
-use crate::{Class, NodeId, Scene, UIRenderer, Widget};
+use crate::{Class, WidgetId, Scene, UIRenderer, Widget};
 use crate::layout::{Style, Layout};
 use crate::paint::{Color, Fill};
 use crate::geom::{Affine, RoundedRect, RoundedRectRadii};
@@ -33,6 +33,6 @@ impl Widget for Div {
 }
 
 /// Widget function for [`Div`].
-pub fn div(class: impl Class<Div>, r: &mut UIRenderer) -> NodeId {
+pub fn div(class: impl Class<Div>, r: &mut UIRenderer) -> WidgetId {
     r.insert(class.to_widget())
 }

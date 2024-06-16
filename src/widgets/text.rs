@@ -7,7 +7,7 @@ use vello::glyph::Glyph;
 use vello::kurbo::{RoundedRect, RoundedRectRadii, Vec2};
 use vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontQuery, GewyString, NodeId, Scene, UIRenderer, Widget};
+use crate::{Class, FontQuery, GewyString, WidgetId, Scene, UIRenderer, Widget};
 use crate::geom::Affine;
 use crate::layout::{Style, Layout};
 use crate::paint::{Font, Color};
@@ -113,7 +113,7 @@ pub fn text(
     string: impl Into<GewyString>,
     class: impl Class<Text>,
     renderer: &mut UIRenderer
-) -> NodeId {
+) -> WidgetId {
     // Configures text
     let mut text = Text { string: string.into(), ..Default::default() };
     class.apply(&mut text);
