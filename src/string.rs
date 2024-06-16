@@ -11,6 +11,13 @@ pub struct GewyString {
     hash: u64
 }
 
+impl Deref for GewyString {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
 impl From<&'static str> for GewyString {
     fn from(value: &'static str) -> Self {
         let mut hasher = DefaultHasher::new();
