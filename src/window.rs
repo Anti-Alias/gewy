@@ -68,10 +68,10 @@ impl GewyWindowView {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn paint(&mut self, window: &GewyWindow) {
+    pub fn paint(&mut self, node_tree: &NodeTree) {
         let Ok(surface_texture) = self.surface.get_current_texture() else { return };
         self.scene.reset();
-        window.node_tree.paint_root(&mut self.scene);
+        node_tree.paint_root(&mut self.scene);
         self.renderer.render_to_surface(
             &self.device,
             &self.queue,

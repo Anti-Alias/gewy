@@ -1,22 +1,28 @@
 use std::path::Path;
 use gewy::geom::RoundedRectRadii;
 use gewy::paint::{Blob, Color, Font};
-use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyWindow, Text, TextAlign, UIRenderer, Widget};
+use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyAppEvent, GewyContext, GewyWindow, Text, TextAlign, UIRenderer, Widget};
 use gewy::layout::*;
 
 fn main() {
     env_logger::init();
-
-    // Loads fonts into a font_db.
-    // DB is used to query fonts using css-like properties.
-    // Includes fallback logic when queries don't perfectly match.
     let default_font = load_font("assets/fonts/arial.ttf").unwrap();
     let font_db = FontDB::new(default_font);
+    let app = GewyApp::new(font_db);
+    app.start(|event, ctx| {
+        match event {
+            GewyAppEvent::Start => on_start(ctx),
+            GewyAppEvent::Stop  => on_stop(),
+        }
+    });
+}
 
-    // Starts app with a single window
-    let mut app = GewyApp::new(font_db);
-    app.add_window(GewyWindow::new(512, 512, AppWidget));
-    app.start();
+fn on_start(mut ctx: GewyContext) {
+    ctx.add_window(GewyWindow::new(512, 512, AppWidget));
+}
+
+fn on_stop() {
+    println!("GewyApp finished running!");
 }
 
 fn load_font(path: impl AsRef<Path>) -> Result<Font, std::io::Error> {
