@@ -125,8 +125,6 @@ impl NodeTree {
         self.inform_layout_changes(id);
     }
 
-    // FnMut(Size<Option<f32>>, Size<AvailableSpace>, NodeId, Option<&mut NodeContext>, &Style) -> Size<f32>
-
     fn inform_layout_changes(&mut self, id: WidgetId) {
         let widget_layout = self.widgets.layout(id.0).unwrap().clone();
         let widget = self.widgets.get_node_context_mut(id.0).unwrap();

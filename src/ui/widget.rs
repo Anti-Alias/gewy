@@ -14,7 +14,8 @@ pub trait Widget: 'static {
     #[allow(unused)]
     fn style(&self, style: &mut Style) {}
 
-    fn measure(&self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
+    #[allow(unused)]
+    fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
         Size::ZERO
     }
 

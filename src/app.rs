@@ -2,7 +2,7 @@ use slotmap::SlotMap;
 use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowView, Late};
 
@@ -31,6 +31,7 @@ impl GewyApp {
     pub fn start(mut self, event_handler: impl FnMut(GewyAppEvent, GewyContext) + 'static) {
         self.event_handler = Some(Box::new(event_handler));
         let event_loop = EventLoop::new().unwrap();
+        event_loop.set_control_flow(ControlFlow::Wait);
         event_loop.run_app(&mut self).unwrap();
         self.event_handler = None;
     }

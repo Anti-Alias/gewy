@@ -55,7 +55,7 @@ impl Widget for AppWidget {
         div(c_gray, r);                     // Inserts div. Configured with 1 class (c_gray).
         begin(r);                           // Causes subsequent inserts to be children of the last widget inserted (in this case, it was a "div").
             div((c_round, c_green), r);     // Inserts div 
-            text("Line 1\nThis line 2\nLine 3", c_text, r);        // Inserts text
+            text("Line 1\nThis line 2\nLine 3!!!", c_text, r);        // Inserts text
             div((c_round, c_yellow), r);    // Inserts div
         end(r);                             // Causes subsequent inserts to move back to the parent widget (in this case, it's the AppWidget).
         div((c_round, c_blue), r);          // Inserts div.
@@ -66,9 +66,9 @@ impl Widget for AppWidget {
 // --------------- Classes --------------- 
 
 fn c_text(t: &mut Text) {
-    t.width = Some(Dimension::Length(128.0));
-    t.height = Some(Dimension::Length(64.0));
+    t.size.width = Dimension::Length(128.0);
     t.text_align = TextAlign::Center;
+    t.color = Color::BLACK;
 }
 
 fn c_round(d: &mut Div) {
@@ -99,7 +99,7 @@ fn c_green(d: &mut Div) {
         left: LengthPercentageAuto::Length(5.0),
         right: LengthPercentageAuto::Length(5.0),
         top: LengthPercentageAuto::Length(5.0),
-        bottom: LengthPercentageAuto::Length(5.0),
+        bottom: LengthPercentageAuto::Length(5.0),  
     };
 }
 
@@ -113,8 +113,8 @@ fn c_gray(d: &mut Div) {
     s.justify_content = Some(JustifyContent::Center);
     s.align_items = Some(AlignItems::Center);
     d.radii = RoundedRectRadii::from_single_radius(20.0);
-    s.size.width = Dimension::Percent(0.5);
-    s.size.height = Dimension::Percent(129.0);
+    s.size.width = Dimension::Length(100.0);
+    s.size.height = Dimension::Length(256.0);
     s.flex_direction = FlexDirection::Column;
     d.color = Color::GRAY;
 }
