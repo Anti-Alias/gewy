@@ -1,5 +1,4 @@
-use smallvec::SmallVec;
-use taffy::{AvailableSpace, Size, TaffyTree, TraversePartialTree};
+use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
 use crate::{FontDB, Scene, UIRenderer, Widget};
 use crate::layout::Style;
@@ -96,11 +95,13 @@ impl NodeTree {
         let widget = self.widgets.get_node_context(id.0).unwrap();
         let widget_layout = self.widgets.layout(id.0).unwrap();
         widget.paint(scene, widget_layout, affine);
+
+
         // Paints children
         let widget_children = self.widgets.children(id.0).unwrap();
-
         if widget_children.is_empty() { return };
         let transl = Vec2::new(widget_layout.location.x as f64, widget_layout.location.y as f64);
+
         affine = affine.then_translate(transl);
         for child_id in widget_children {
             self.paint(WidgetId(child_id), scene, affine);
@@ -149,42 +150,6 @@ mod test {
     struct BlankWidget;
     impl Widget for BlankWidget {}
 
-
-    //////////////////////////////
-    //          A
-    //         / \
-    //        B   D
-    //       /   / \
-    //      C   E   F
-    #[test]
-    fn test_hierarchy() {
-        let mut tree = NodeTree::new(BlankWidget);
-
-        // Builds tree
-        let a_id = tree.root_id;
-        let b_id = tree.insert(BlankWidget, a_id).unwrap();
-        let c_id = tree.insert(BlankWidget, b_id).unwrap();
-        let d_id = tree.insert(BlankWidget, a_id).unwrap();
-        let e_id = tree.insert(BlankWidget, d_id).unwrap();
-        let f_id = tree.insert(BlankWidget, d_id).unwrap();
-        let a = tree.get(a_id).unwrap();
-        let b = tree.get(b_id).unwrap();
-        let c = tree.get(c_id).unwrap();
-        let d = tree.get(d_id).unwrap();
-        let e = tree.get(e_id).unwrap();
-        let f = tree.get(f_id).unwrap();
-
-        // Tests structure
-        // assert_eq!(None, a.parent_id);
-        // assert_eq!(Some(a_id), b.parent_id);
-        // assert_eq!(Some(a_id), d.parent_id);
-        // assert_eq!(&[b_id, d_id], a.children_ids());
-        // assert!(c.children_ids().is_empty());
-        // assert_eq!(Some(d_id), e.parent_id);
-        // assert_eq!(Some(d_id), f.parent_id);
-        // assert!(e.children_ids().is_empty());
-        // assert!(f.children_ids().is_empty());
-    }
 
     //////////////////////////////
     //          A

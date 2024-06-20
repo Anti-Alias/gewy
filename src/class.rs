@@ -1,11 +1,11 @@
-/**
- * Anything that can manipulate a widget.
- * This is usually either a callback function, or a tuple of callback functions.
- * This is useful for externalizing widget configuration.
- */
+/// A callback function, or a tuple of callback functions, designed to configure a [`Widget`](crate::Widget).
+/// This is useful for externalizing widget configuration.
 pub trait Class<W> {
+    /// Configures a widget.
     fn apply(&self, widget: &mut W);
-    fn to_widget(&self) -> W
+    /// Configures a default widget, then returns it.
+    /// A shorthand for [`Self::apply`].
+    fn produce(&self) -> W
     where
         W: Default
     {

@@ -34,5 +34,6 @@ impl Widget for Div {
 
 /// Widget function for [`Div`].
 pub fn div(class: impl Class<Div>, r: &mut UIRenderer) -> WidgetId {
-    r.insert(class.to_widget())
+    let div = class.produce();
+    r.insert(div)
 }

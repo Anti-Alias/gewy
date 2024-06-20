@@ -46,19 +46,19 @@ impl Widget for AppWidget {
     }
 
     /// A UIRenderer is used to build the DOM tree underneath this [`Widget`].
-    /// The elements inserted (divs, texts, buttons etc) are also [`Widget`].
+    /// The elements inserted (divs, texts, buttons etc) are also [`Widget`]s.
     /// Other UI frameworks refer to these as "components" (React, Angular etc).
-    /// Some privimitive [`Widget`]s like divs allow for their [`Style`]s to be externally configured via class callback functions (or tuples of these).
+    /// Some privimitive [`Widget`] functions like div() allow for external configuration via callback functions called "classes".
     /// Most higher level [`Widget`]s do not provide this functionality, however.
     fn render(&self, r: &mut UIRenderer) {
-        div((c_round, c_red), r);           // Inserts div. Configured with 2 classes (c_round, c_red).
-        div(c_gray, r);                     // Inserts div. Configured with 1 class (c_gray).
-        begin(r);                           // Causes subsequent inserts to be children of the last widget inserted (in this case, it was a "div").
-            div((c_round, c_green), r);     // Inserts div 
-            text("Line 1\nThis line 2\nLine 3!!!", c_text, r);        // Inserts text
-            div((c_round, c_yellow), r);    // Inserts div
-        end(r);                             // Causes subsequent inserts to move back to the parent widget (in this case, it's the AppWidget).
-        div((c_round, c_blue), r);          // Inserts div.
+        div((c_round, c_red), r);                   // Inserts div. Configured with 2 classes (c_round, c_red).
+        div(c_gray, r);                             // Inserts div. Configured with 1 class (c_gray).
+        begin(r);                                   // Causes subsequent inserts to be children of the last widget inserted (in this case, it was a "div").
+            div((c_round, c_green), r);             // Inserts div 
+            text("This is some text!", c_text, r);  // Inserts text
+            div((c_round, c_yellow), r);            // Inserts div
+        end(r);                                     // Causes subsequent inserts to move back to the parent widget (in this case, it's the AppWidget).
+        div((c_round, c_blue), r);                  // Inserts div.
     }
 }
 
@@ -66,9 +66,8 @@ impl Widget for AppWidget {
 // --------------- Classes --------------- 
 
 fn c_text(t: &mut Text) {
-    t.size.width = Dimension::Length(128.0);
-    t.text_align = TextAlign::Center;
     t.color = Color::BLACK;
+    t.text_align = TextAlign::Center;
 }
 
 fn c_round(d: &mut Div) {
@@ -113,7 +112,7 @@ fn c_gray(d: &mut Div) {
     s.justify_content = Some(JustifyContent::Center);
     s.align_items = Some(AlignItems::Center);
     d.radii = RoundedRectRadii::from_single_radius(20.0);
-    s.size.width = Dimension::Length(100.0);
+    s.size.width = Dimension::Percent(0.8);
     s.size.height = Dimension::Length(256.0);
     s.flex_direction = FlexDirection::Column;
     d.color = Color::GRAY;
