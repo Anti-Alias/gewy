@@ -1,4 +1,5 @@
-use crate::{Class, WidgetId, Scene, Renderer, Widget};
+use crate::{Class, WidgetId, Renderer, Widget};
+use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
 use crate::kurbo::{Affine, RoundedRect, RoundedRectRadii};

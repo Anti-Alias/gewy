@@ -9,7 +9,8 @@ use crate::vello::glyph::Glyph;
 use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontQuery, GewyString, Renderer, Scene, ToGewyString, Widget, WidgetId};
+use crate::{Class, FontQuery, GewyString, Renderer, ToGewyString, Widget, WidgetId};
+use crate::vello::Scene;
 
 /// A simple text [`Widget`](crate::Widget).
 pub struct Text {
@@ -45,7 +46,6 @@ impl Default for Text {
 impl Widget for Text {
 
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
-        println!("known: {known_size:#?}, avail: {available_space:#?}");
         match (known_size.width, available_space.width) {
             (None, AvailableSpace::Definite(def_width)) => {
                 let mut lines = GlyphLines::new(
@@ -94,7 +94,6 @@ impl Widget for Text {
     }
 
     fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {
-        
         // Paints background
         if self.background_color.a != 0  {
             let rect = Rect::new(
@@ -103,7 +102,6 @@ impl Widget for Text {
                 (layout.location.x + layout.size.width) as f64,
                 (layout.location.y + layout.size.height) as f64,
             );
-            println!("{:?}", affine);
             scene.fill(Fill::NonZero, affine, self.background_color, None, &rect);
         }
 

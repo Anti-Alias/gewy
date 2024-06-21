@@ -1,6 +1,7 @@
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
-use crate::{FontDB, Scene, Renderer, Widget};
+use crate::{FontDB, Renderer, Widget};
+use crate::vello::Scene;
 use crate::taffy::Style;
 
 

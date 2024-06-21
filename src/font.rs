@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use vello::peniko::Font;
+use std::path::Path;
+use vello::peniko::{Blob, Font};
 use crate::GewyString;
 
 /// A query for a particular [`Font`](crate::paint::Font).
@@ -71,6 +72,15 @@ impl FontDB {
             default_font,
             entries: BTreeMap::new()
         }
+    }
+
+    pub fn load(default_font: impl AsRef<Path>) -> Result<Self, std::io::Error> {
+        let font_bytes = std::fs::read(default_font.as_ref())?;
+        let font_blob = Blob::from(font_bytes);
+        Ok(Self {
+            default_font: Font::new(font_blob, 0),
+            entries: BTreeMap::new()
+        })
     }
 
     pub fn default_font(&self) -> &Font {

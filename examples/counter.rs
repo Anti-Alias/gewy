@@ -1,13 +1,11 @@
-use std::path::Path;
 use gewy::kurbo::RoundedRectRadii;
-use gewy::peniko::{Blob, Color, Font};
-use gewy::{div_begin, end, margin, padding, size, text, Div, FontDB, GewyApp, GewyAppEvent, GewyContext, GewyWindow, Renderer, Text, ToGewyString, Widget};
+use gewy::peniko::Color;
+use gewy::{div_begin, end, margin_all, padding_all, pc, px, size_all, text, Div, FontDB, GewyApp, GewyAppEvent, GewyContext, GewyWindow, Renderer, Text, ToGewyString, Widget};
 use gewy::taffy::*;
 
 fn main() {
     env_logger::init();
-    let default_font = load_font("assets/fonts/Roboto-Regular.ttf").unwrap();
-    let font_db = FontDB::new(default_font);
+    let font_db = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
     let app = GewyApp::new(font_db);
     app.start(|event, ctx| {
         match event {
@@ -19,14 +17,6 @@ fn main() {
 
 fn on_start(mut ctx: GewyContext) {
     ctx.add_window(GewyWindow::new(512, 512, AppWidget));
-    ctx.add_window(GewyWindow::new(512, 512, AppWidget));
-    ctx.add_window(GewyWindow::new(512, 512, AppWidget));
-}
-
-fn load_font(path: impl AsRef<Path>) -> Result<Font, std::io::Error> {
-    let bytes = std::fs::read(path)?;
-    let bytes = Blob::from(bytes);
-    Ok(Font::new(bytes, 0))
 }
 
 
@@ -34,8 +24,7 @@ struct AppWidget;
 impl Widget for AppWidget {
 
     fn style(&self, s: &mut Style) {
-        s.size.width = Dimension::Percent(1.0);
-        s.size.height = Dimension::Percent(1.0);
+        s.size = size_all(pc(1.0));
         s.flex_direction = FlexDirection::Column;
         s.justify_content = Some(JustifyContent::Center);
         s.align_items = Some(AlignItems::Center);
@@ -71,8 +60,8 @@ fn c_counter(d: &mut Div) {
     let s = &mut d.style;
     d.color = Color::GRAY;
     d.radii = RoundedRectRadii::from(3.0);
-    s.margin = margin::px_all(5.0);
-    s.padding = padding::px_all(5.0);
+    s.margin = margin_all(px(5));
+    s.padding = padding_all(px(5));
     s.flex_direction = FlexDirection::Column;
     s.justify_content = Some(JustifyContent::Center);
     s.align_items = Some(AlignItems::Center);
@@ -89,8 +78,8 @@ fn inc_dec(d: &mut Div) {
     d.color = Color::rgb(0.1, 0.1, 0.1);
     d.radii = RoundedRectRadii::from(3.0);
     s.justify_content = Some(JustifyContent::Center);
-    s.align_items = AlignItems::Center.into();
-    s.size = size::px(22.0, 22.0);
+    s.align_items = Some(AlignItems::Center);
+    s.size = size_all(px(22));
 }
 
 fn text_dark(text: &mut Text) {
