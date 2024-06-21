@@ -4,7 +4,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
-use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowView, Late};
+use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowView};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct GewyApp {
@@ -51,8 +51,8 @@ impl GewyApp {
     // Initializes all uninitialized window views if force is false.
     fn init_window_views(&mut self, event_loop: &ActiveEventLoop, force: bool) {
         for window in self.windows.values_mut() {
-            if force || window.view.is_init() { continue };
-            window.view = Late::Init(GewyWindowView::new(
+            if force || window.view.is_some() { continue };
+            window.view = Some(GewyWindowView::new(
                 &self.instance,
                 window.content_width,
                 window.content_height,
@@ -149,7 +149,4 @@ impl<'a> GewyContext<'a> {
 
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum GewyAppEvent {
-    Start,
-    Stop,
-}
+pub enum GewyAppEvent { Start, Stop }

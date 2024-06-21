@@ -1,8 +1,8 @@
 use std::path::Path;
 use gewy::geom::RoundedRectRadii;
 use gewy::paint::{Blob, Color, Font};
-use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyAppEvent, GewyContext, GewyWindow, Text, TextAlign, UIRenderer, Widget};
-use gewy::layout::*;
+use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyAppEvent, GewyContext, GewyWindow, Text, TextAlign, Renderer, Widget};
+use gewy::taffy::*;
 
 fn main() {
     env_logger::init();
@@ -50,7 +50,7 @@ impl Widget for AppWidget {
     /// Other UI frameworks refer to these as "components" (React, Angular etc).
     /// Some privimitive [`Widget`] functions like div() allow for external configuration via callback functions called "classes".
     /// Most higher level [`Widget`]s do not provide this functionality, however.
-    fn render(&self, r: &mut UIRenderer) {
+    fn render(&self, r: &mut Renderer) {
         div((c_round, c_red), r);                   // Inserts div. Configured with 2 classes (c_round, c_red).
         div(c_gray, r);                             // Inserts div. Configured with 1 class (c_gray).
         begin(r);                                   // Causes subsequent inserts to be children of the last widget inserted (in this case, it was a "div").

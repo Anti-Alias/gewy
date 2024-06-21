@@ -1,6 +1,5 @@
 use std::num::NonZeroUsize;
 use std::pin::Pin;
-
 use pollster::block_on;
 use vello::peniko::Color;
 use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
@@ -8,8 +7,7 @@ use wgpu::{Adapter, CompositeAlphaMode, Device, DeviceDescriptor, Instance, Pres
 use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
-
-use crate::{Late, NodeTree, Widget};
+use crate::{NodeTree, Widget};
 
 /// Stores [`winit`] window and associated graphics state.
 pub(crate) struct GewyWindowView {
@@ -103,8 +101,8 @@ slotmap::new_key_type! {
 pub struct GewyWindow {
     pub(crate) content_width: u32,
     pub(crate) content_height: u32,
-    pub(crate) node_tree: NodeTree,         // UI DOM
-    pub(crate) view: Late<GewyWindowView>,  // Graphical representation of window. Stores GPU primitives.
+    pub(crate) node_tree: NodeTree,             // UI DOM
+    pub(crate) view: Option<GewyWindowView>,    // Graphical representation of window. Stores GPU primitives.
 }
 
 impl GewyWindow {
@@ -113,7 +111,7 @@ impl GewyWindow {
             content_width,
             content_height,
             node_tree: NodeTree::new(widget),
-            view: Late::Uninit,
+            view: None,
         }
     }
     /// Width of the content of the window. Excludes borders.

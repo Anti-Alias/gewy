@@ -18,6 +18,16 @@ impl Deref for GewyString {
     }
 }
 
+pub trait ToGewyString {
+    fn go_gewy_string(self) -> GewyString;
+}
+
+impl<S: Into<GewyString>> ToGewyString for S {
+    fn go_gewy_string(self) -> GewyString {
+        self.into()
+    }
+}
+
 impl From<&'static str> for GewyString {
     fn from(value: &'static str) -> Self {
         let mut hasher = DefaultHasher::new();

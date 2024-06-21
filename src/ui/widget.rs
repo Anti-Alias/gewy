@@ -2,8 +2,8 @@ use smallvec::SmallVec;
 use vello::Scene;
 
 use crate::{FontDB, WidgetId, NodeTree};
-use crate::layout::{Style, Layout, Size, AvailableSpace};
-use crate::geom::Affine;
+use crate::taffy::{Style, Layout, Size, AvailableSpace};
+use crate::kurbo::Affine;
 
 /// A paintable UI element in a [`NodeTree`].
 /// For instance, a text element, a div, a button etc.
@@ -19,11 +19,6 @@ pub trait Widget: 'static {
         Size::ZERO
     }
 
-    /// Invoked when a [`Widget`] finishes computing its layout.
-    /// Same value is passed into paint().
-    #[allow(unused)]
-    fn layout(&mut self, layout: &Layout) {}
-
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.
     #[allow(unused)]
@@ -31,22 +26,22 @@ pub trait Widget: 'static {
 
     /// Renders descendant [`Widget`]s.
     #[allow(unused)]
-    fn render(&self, r: &mut UIRenderer) {}
+    fn render(&self, r: &mut Renderer) {}
 }
 
 /// Builds the descendants of a [`Widget`] in its [`render`](Widget::render) method using the
 /// [`insert`](Self::insert), [`begin`](Self::begin) and [`end`](Self::end) methods.
 /// "Rendering" in this context means building a sub-tree of UI nodes.
 /// Internally, this is writing to a subtree of a [`NodeTree`].
-pub struct UIRenderer<'a> {
+pub struct Renderer<'a> {
     node_tree: &'a mut NodeTree,        // Tree being written to.
-    current: WidgetId,                    // "Current" widget. Calls to insert() will append children to this widget.
-    last: Option<WidgetId>,               // "Last" widget inserted as a child of the "current" widget.
-    ancestors: SmallVec<[WidgetId; 8]>,   // Stack of ancestors to the "current" widget. Can include parent, grandparent, etc. If empty, calls to end() will panic.
-    font_db: &'a FontDB,
+    current: WidgetId,                  // "Current" widget. Calls to insert() will append children to this widget.
+    last: Option<WidgetId>,             // "Last" widget inserted as a child of the "current" widget.
+    ancestors: SmallVec<[WidgetId; 8]>, // Stack of ancestors to the "current" widget. Can include parent, grandparent, etc. If empty, calls to end() will panic.
+    font_db: &'a FontDB,                // Font DB reference. Used for widgets that paint text.
 }
 
-impl<'a> UIRenderer<'a> {
+impl<'a> Renderer<'a> {
     pub(crate) fn new(
         node_tree: &'a mut NodeTree,
         starting_node: WidgetId,
@@ -100,12 +95,12 @@ impl<'a> UIRenderer<'a> {
 
 /// DSL function that just calls [`begin`](UIRenderer::begin)
 #[inline(always)]
-pub fn begin(r: &mut UIRenderer) {
+pub fn begin(r: &mut Renderer) {
     r.begin();
 }
 
 /// DSL function that just calls [`end`](UIRenderer::end)
 #[inline(always)]
-pub fn end(r: &mut UIRenderer) {
+pub fn end(r: &mut Renderer) {
     r.end();
 }

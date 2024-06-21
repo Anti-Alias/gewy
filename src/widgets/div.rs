@@ -1,7 +1,7 @@
-use crate::{Class, WidgetId, Scene, UIRenderer, Widget};
-use crate::layout::{Style, Layout};
-use crate::paint::{Color, Fill};
-use crate::geom::{Affine, RoundedRect, RoundedRectRadii};
+use crate::{Class, WidgetId, Scene, Renderer, Widget};
+use crate::taffy::{Style, Layout};
+use crate::peniko::{Color, Fill};
+use crate::kurbo::{Affine, RoundedRect, RoundedRectRadii};
 
 #[derive(Default, Debug)]
 pub struct Div {
@@ -29,11 +29,18 @@ impl Widget for Div {
     }
 
     #[allow(unused)]
-    fn render(&self, r: &mut UIRenderer) {}
+    fn render(&self, r: &mut Renderer) {}
 }
 
 /// Widget function for [`Div`].
-pub fn div(class: impl Class<Div>, r: &mut UIRenderer) -> WidgetId {
+pub fn div(class: impl Class<Div>, r: &mut Renderer) -> WidgetId {
     let div = class.produce();
     r.insert(div)
+}
+
+pub fn div_begin(class: impl Class<Div>, r: &mut Renderer) -> WidgetId {
+    let div = class.produce();
+    let id = r.insert(div);
+    r.begin();
+    id
 }

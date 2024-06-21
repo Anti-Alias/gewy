@@ -1,7 +1,7 @@
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
-use crate::{FontDB, Scene, UIRenderer, Widget};
-use crate::layout::Style;
+use crate::{FontDB, Scene, Renderer, Widget};
+use crate::taffy::Style;
 
 
 /// ID of a [`Widget`](crate::Widget).
@@ -82,7 +82,7 @@ impl NodeTree {
             let widget = widget.as_ref();
             std::mem::transmute(widget)
         };
-        let mut renderer = UIRenderer::new(self, id, font_db);
+        let mut renderer = Renderer::new(self, id, font_db);
         widget.render(&mut renderer);
     }
 
@@ -112,8 +112,7 @@ impl NodeTree {
         self.compute_layout(self.root_id, width, height);
     }
 
-    /// Computes the layout of the node specified recursively.
-    /// Then, informs the [`Widget`] of each node of the layout change recursively.
+    /// Computes the layout of the [`Widget`] specified recursively.
     pub(crate) fn compute_layout(&mut self, id: WidgetId, width: f32, height: f32) {
         let space = Size {
             width: AvailableSpace::Definite(width),
@@ -121,19 +120,9 @@ impl NodeTree {
         };
         self.widgets.compute_layout_with_measure(id.0, space, |size, size_available, _, widget, _| {
             let widget = widget.unwrap();
-            widget.measure(size, size_available)
+            let measured_size = widget.measure(size, size_available);
+            measured_size
         }).unwrap();
-        self.inform_layout_changes(id);
-    }
-
-    fn inform_layout_changes(&mut self, id: WidgetId) {
-        let widget_layout = self.widgets.layout(id.0).unwrap().clone();
-        let widget = self.widgets.get_node_context_mut(id.0).unwrap();
-        widget.layout(&widget_layout);
-        let children = self.widgets.children(id.0).unwrap();
-        for child_id in children {
-            self.inform_layout_changes(WidgetId(child_id));
-        }
     }
 }
 

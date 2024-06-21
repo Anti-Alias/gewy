@@ -1,16 +1,16 @@
 use taffy::{AvailableSpace, Dimension};
-use vello::glyph::skrifa::charmap::Charmap;
-use vello::glyph::skrifa::instance::Size as FontSize;
-use vello::glyph::skrifa::metrics::GlyphMetrics;
-use vello::glyph::skrifa::{FontRef, MetadataProvider};
-use vello::glyph::Glyph;
-use vello::kurbo::{Rect, Vec2};
-use vello::peniko::{Brush, Fill};
+use crate::vello::glyph::skrifa::charmap::Charmap;
+use crate::vello::glyph::skrifa::instance::Size as FontSize;
+use crate::vello::glyph::skrifa::metrics::GlyphMetrics;
+use crate::vello::glyph::skrifa::{FontRef, MetadataProvider};
+use crate::vello::glyph::Glyph;
+use crate::vello::kurbo::{Rect, Vec2};
+use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontQuery, GewyString, WidgetId, Scene, UIRenderer, Widget};
-use crate::geom::Affine;
-use crate::layout::{Style, Layout, Size};
-use crate::paint::{Font, Color};
+use crate::{Class, FontQuery, GewyString, Renderer, Scene, ToGewyString, Widget, WidgetId};
+use crate::taffy::*;
+use crate::kurbo::*;
+use crate::peniko::*;
 
 /// A simple text [`Widget`](crate::Widget).
 pub struct Text {
@@ -29,7 +29,7 @@ pub struct Text {
 impl Default for Text {
     fn default() -> Self {
         Self {
-            string: "".into(),
+            string: "".go_gewy_string(),
             font: FontQuery::default(),
             line_height: 1.2,
             color: Color::WHITE,
@@ -46,6 +46,7 @@ impl Default for Text {
 impl Widget for Text {
 
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
+        println!("known: {known_size:#?}, avail: {available_space:#?}");
         match (known_size.width, available_space.width) {
             (None, AvailableSpace::Definite(def_width)) => {
                 let mut lines = GlyphLines::new(
@@ -65,8 +66,7 @@ impl Widget for Text {
                     &self.string,
                     self._font.as_ref().unwrap(),
                     self.line_height,
-                    self.font.size,
-                    f32::INFINITY,
+                    self.font.size,f32::INFINITY,
                     self.word_wrap,
                 );
                 self._glyphs = lines.glyphs;
@@ -104,6 +104,7 @@ impl Widget for Text {
                 (layout.location.x + layout.size.width) as f64,
                 (layout.location.y + layout.size.height) as f64,
             );
+            println!("{:?}", affine);
             scene.fill(Fill::NonZero, affine, self.background_color, None, &rect);
         }
 
@@ -130,12 +131,15 @@ pub enum TextAlign {
 }
 
 pub fn text(
-    string: impl Into<GewyString>,
+    string: impl ToGewyString,
     class: impl Class<Text>,
-    renderer: &mut UIRenderer
+    renderer: &mut Renderer
 ) -> WidgetId {
     // Configures text
-    let mut text = Text { string: string.into(), ..Default::default() };
+    let mut text = Text {
+        string: string.go_gewy_string(),
+        ..Default::default()
+    };
     class.apply(&mut text);
     // Finalizes text
     let font = renderer.font_db().query(&text.font).clone();
@@ -177,20 +181,23 @@ impl GlyphLines {
         let line_height = line_height * font_size;
         let font_ref = to_font_ref(font).unwrap();
         let axes = font_ref.axes();
-        let font_size = FontSize::new(font_size);
+        let fs = FontSize::new(font_size);
         let var_loc = axes.location(variations);
         let charmap = font_ref.charmap();
-        let glyph_metrics = font_ref.glyph_metrics(font_size, &var_loc);
+        let glyph_metrics = font_ref.glyph_metrics(fs, &var_loc);
 
-        let metrics = font_ref.metrics(font_size, &var_loc);
-        let offset_y = metrics.ascent - metrics.descent + metrics.leading;
+        let metrics = font_ref.metrics(fs, &var_loc);
 
-        if !word_wrap {
-            Self::non_wrapping(string, offset_y, line_height, max_width, glyph_metrics, charmap)
+        let mut result = if !word_wrap {
+            Self::non_wrapping(string, line_height, max_width, glyph_metrics, charmap)
         }
         else {
-            Self::wrapping(string, offset_y, line_height, max_width, glyph_metrics, charmap)
+            Self::wrapping(string, line_height, max_width, glyph_metrics, charmap)
+        };
+        for glyph in &mut result.glyphs {
+            glyph.y += metrics.ascent;
         }
+        result
     }
 
     fn align(&mut self, align: TextAlign, width: f32) {
@@ -234,7 +241,6 @@ impl GlyphLines {
     fn non_wrapping(
         string: &str,
         line_height: f32,
-        offset_y: f32,
         max_width: f32,
         glyph_metrics: GlyphMetrics,
         charmap: Charmap
@@ -243,7 +249,7 @@ impl GlyphLines {
         let mut result = Self::default();
         let mut current_line = Line::default();
         let mut pen_x: f32 = 0.0;
-        let mut pen_y: f32 = offset_y;
+        let mut pen_y: f32 = 0.0;
 
         // Logic for consuming a single character into the result
         let mut consume_char = |c: char| {
@@ -289,7 +295,6 @@ impl GlyphLines {
     fn wrapping(
         string: &str,
         line_height: f32,
-        offset_y: f32,
         max_width: f32,
         glyph_metrics: GlyphMetrics,
         charmap: Charmap
@@ -329,7 +334,6 @@ impl GlyphLines {
 
         // Globalizes glyph coordinates
         for token in &mut tokens {
-            token.y += offset_y;
             token.offset_glyphs(&mut result.glyphs);
             let max_x = token.x + token.width;
             let max_y = token.y + line_height;
