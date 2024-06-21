@@ -1,4 +1,6 @@
-use taffy::{AvailableSpace, Dimension};
+use taffy::{AvailableSpace, Dimension, Layout, Size, Style};
+use vello::kurbo::Affine;
+use vello::peniko::{Color, Font};
 use crate::vello::glyph::skrifa::charmap::Charmap;
 use crate::vello::glyph::skrifa::instance::Size as FontSize;
 use crate::vello::glyph::skrifa::metrics::GlyphMetrics;
@@ -8,9 +10,6 @@ use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
 use crate::{Class, FontQuery, GewyString, Renderer, Scene, ToGewyString, Widget, WidgetId};
-use crate::taffy::*;
-use crate::kurbo::*;
-use crate::peniko::*;
 
 /// A simple text [`Widget`](crate::Widget).
 pub struct Text {

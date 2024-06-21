@@ -1,6 +1,6 @@
 use std::path::Path;
-use gewy::geom::RoundedRectRadii;
-use gewy::paint::{Blob, Color, Font};
+use gewy::kurbo::RoundedRectRadii;
+use gewy::peniko::{Blob, Color, Font};
 use gewy::{begin, div, end, text, Div, FontDB, GewyApp, GewyAppEvent, GewyContext, GewyWindow, Text, TextAlign, Renderer, Widget};
 use gewy::taffy::*;
 
