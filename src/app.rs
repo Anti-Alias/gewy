@@ -1,21 +1,23 @@
+use std::any::Any;
+
 use slotmap::SlotMap;
 use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::WindowId;
-use crate::{FontDB, GewyWindow, GewyWindowId, GewyWindowView};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
+use winit::window::WindowId as WinitWindowId;
+use crate::{FontDB, FromStore, Id, InputEvent, Store, Window, WindowGraphics, WindowId};
 
 /// Application that displays a gewy UI in a single winit window.
-pub struct GewyApp {
+pub struct App {
     instance: Instance,
-    windows: SlotMap<GewyWindowId, GewyWindow>,    // Parallel with 'windows'.
+    windows: SlotMap<WindowId, Window>,
     font_db: FontDB,
-    event_handler: Option<Box<dyn FnMut(GewyAppEvent, GewyContext)>>,
-    started: bool,
+    store: Store,
+    event_handler: Option<Box<dyn FnMut(&mut Self, AppEvent)>>,
 }
 
-impl GewyApp {
+impl App {
     
     pub fn new(font_db: FontDB) -> Self {
         Self {
@@ -23,36 +25,29 @@ impl GewyApp {
             windows: SlotMap::default(),
             font_db,
             event_handler: None,
-            started: false,
+            store: Store::new(),
         }
     }
 
     /// Starts the application. Blocks until closed.
-    pub fn start(mut self, event_handler: impl FnMut(GewyAppEvent, GewyContext) + 'static) {
-        self.event_handler = Some(Box::new(event_handler));
-        let event_loop = EventLoop::new().unwrap();
+    pub fn start<F>(mut self, mut startup: F)
+    where
+        F: FnMut(&mut AppCtx),
+    {
+        let mut ctx = AppCtx { app: &mut self };
+        startup(&mut ctx);
+
+        let event_loop: EventLoop<AppEvent> = EventLoop::with_user_event().build().unwrap();
+        let proxy = event_loop.create_proxy();
+        let mut listener = AppListener::new(self, proxy);
         event_loop.set_control_flow(ControlFlow::Wait);
-        event_loop.run_app(&mut self).unwrap();
-        self.event_handler = None;
+        event_loop.run_app(&mut listener).unwrap();
     }
 
-    /// Fires a [`GewyAppEvent`]. Handled by the handler supplied in the start() method.
-    pub(crate) fn fire(&mut self, event: GewyAppEvent, event_loop: &ActiveEventLoop) {
-        // Calls event handler
-        let mut event_handler = self.event_handler.take().unwrap();
-        let ctx = GewyContext { app: self };
-        event_handler(event, ctx);
-        self.event_handler = Some(event_handler);
-        // Updates internal state reflecting recent changes
-        self.init_window_views(event_loop, false);
-    }
-
-    // Initializes all window views if force is true.
-    // Initializes all uninitialized window views if force is false.
-    fn init_window_views(&mut self, event_loop: &ActiveEventLoop, force: bool) {
+    fn create_window_graphics(&mut self, event_loop: &ActiveEventLoop) {
         for window in self.windows.values_mut() {
-            if force || window.view.is_some() { continue };
-            window.view = Some(GewyWindowView::new(
+            if window.graphics.is_some() { continue };
+            window.graphics = Some(WindowGraphics::new(
                 &self.instance,
                 window.content_width,
                 window.content_height,
@@ -61,31 +56,46 @@ impl GewyApp {
         }
     }
 
+    fn render_windows(&mut self) {
+        for window in self.windows.values_mut() {
+            window.render(&self.font_db, &self.store);
+            window.compute_layout();
+        }
+    }
+
+    fn destroy_window_graphics(&mut self) {
+        for window in self.windows.values_mut() {
+            window.graphics = None;
+        }
+    }
+
     /// Adds a Window to the app.
-    fn add_window(&mut self, mut window: GewyWindow) -> GewyWindowId {
-        let root_id = window.node_tree.root_id();
-        window.node_tree.render(root_id, &self.font_db);
+    fn add_window(&mut self, window: Window) -> WindowId {
         self.windows.insert(window)
     }
 
     /// Removes a window from the app.
-    fn remove_window(&mut self, window_id: GewyWindowId) -> Option<GewyWindow> {
+    fn remove_window(&mut self, window_id: WindowId) -> Option<Window> {
         self.windows.remove(window_id)
     }
 
-    /// Gets mutable [`GewyWindowView`] using winit window id.
-    fn get_window_with_winit_id(&mut self, winit_window_id: WindowId) -> Option<&mut GewyWindow> {
-        self.windows.values_mut().find(|window| {
-            let current_id = window.view.as_ref().unwrap().winit_window_id();
-            current_id == winit_window_id
-        })
+    pub fn set_event_handler(&mut self, event_handler: impl FnMut(&mut Self, AppEvent) + 'static) {
+        self.event_handler = Some(Box::new(event_handler));
     }
 
-    /// Removes a [`GewyWindowView`] / [`GewyWindow`] pair using winit window id.
-    fn remove_window_with_winit_id(&mut self, winit_window_id: WindowId, event_loop: &ActiveEventLoop) {
+    fn get_window_winit(&mut self, winit_id: WinitWindowId) -> Option<(&mut Window, &mut Store)> {
+        self.windows.values_mut()
+            .find(|window| {
+                let current_id = window.graphics.as_ref().unwrap().winit_id();
+                current_id == winit_id
+            })
+            .map(|window| (window, &mut self.store))
+    }
+
+    fn remove_window_winit(&mut self, winit_id: WinitWindowId, event_loop: &ActiveEventLoop) {
         self.windows.retain(|_, window| {
-            let current_id = window.view.as_ref().unwrap().winit_window_id();
-            current_id != winit_window_id
+            let current_id = window.graphics.as_ref().unwrap().winit_id();
+            current_id != winit_id
         });
         if self.windows.is_empty() {
             event_loop.exit();
@@ -93,60 +103,130 @@ impl GewyApp {
     }
 }
 
-impl ApplicationHandler for GewyApp {
+struct AppListener {
+    app: App,
+    proxy: EventLoopProxy<AppEvent>,
+    started: bool,
+}
+
+impl AppListener {
+    fn new(app: App, proxy: EventLoopProxy<AppEvent>) -> Self {
+        Self {
+            app,
+            proxy,
+            started: false,
+        }
+    }
+}
+
+impl ApplicationHandler<AppEvent> for AppListener {
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.started {
-            self.fire(GewyAppEvent::Start, event_loop);
+            self.app.create_window_graphics(event_loop);
+            self.app.render_windows();
             self.started = true;
         }
         else {
-            self.init_window_views(event_loop, true);
+            self.app.create_window_graphics(event_loop);
         }
-        log::info!("{} window state created", self.windows.len());
+        log::info!("{} window(s) created", self.app.windows.len());
+    }
+
+    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+        self.app.destroy_window_graphics();
     }
 
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        winit_window_id: WindowId,
-        event: winit::event::WindowEvent,
+        winit_id: WinitWindowId,
+        event: WindowEvent,
     ) {
+
+        // Updates relevant window
         log::trace!("Handling window event: {event:?}");
-        let Some(window) = self.get_window_with_winit_id(winit_window_id) else { return };
-        let node_tree = &window.node_tree;
-        let window_view = window.view.as_mut().unwrap();
+        let Some((window, store)) = self.app.get_window_winit(winit_id) else { return };
         match event {
-            WindowEvent::Resized(size) => {
-                window_view.resize(size.width, size.height);
-                window.node_tree.compute_layout_root(size.width as f32, size.height as f32);
-            },
-            WindowEvent::RedrawRequested => window_view.paint(node_tree),
-            WindowEvent::CloseRequested => self.remove_window_with_winit_id(winit_window_id, event_loop),
+            WindowEvent::CursorEntered { .. }               => window.fire_input_event(InputEvent::CursorEntered, store),
+            WindowEvent::CursorLeft { .. }                  => window.fire_input_event(InputEvent::CursorLeft, store),
+            WindowEvent::CursorMoved { position, .. }       => window.fire_input_event(InputEvent::CursorMoved { x: position.x as f32, y: position.y as f32 }, store),
+            WindowEvent::MouseInput { state, button, .. }   => window.fire_input_event(InputEvent::from_winit_mouse(state, button), store),
+            WindowEvent::Resized(size)                      => window.resize(size.width, size.height),
+            WindowEvent::RedrawRequested                    => window.paint(),
+            WindowEvent::CloseRequested                     => self.app.remove_window_winit(winit_id, event_loop),
             _ => {}
         }
+
+        // Broadcasts state changes
+        let states_changed = self.app.store.update();
+        if !states_changed.is_empty() {
+            for window in self.app.windows.values_mut() {
+                window.inform_state_changes(&states_changed, &self.app.font_db, &self.app.store);
+                //window.ui.print_diagnostics();
+            }
+        }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+        let Some(mut event_handler) = self.app.event_handler.take() else { return };
+        event_handler(&mut self.app, event);
+        self.app.event_handler = Some(event_handler);
+        self.app.create_window_graphics(event_loop);
     }
 }
 
 
 
-/// Allows for interaction with the [`GewyApp`] as it runs.
-/// Can create and destroy windows.
-pub struct GewyContext<'a> {
-    app: &'a mut GewyApp,
+/// Object that allows for manipulating an [`App`] as it runs.
+pub struct AppCtx<'a> {
+    app: &'a mut App,
 }
 
-impl<'a> GewyContext<'a> {
-    pub fn window_count(&self) -> usize {
-        self.app.windows.len()
-    }
-    pub fn add_window(&mut self, window: GewyWindow) -> GewyWindowId {
+impl<'a> AppCtx<'a> {
+
+    /// Creates a window, returning its id.
+    pub fn add_window(&mut self, window: Window) -> WindowId {
         self.app.add_window(window)
     }
-    pub fn remove_window(&mut self, window_id: GewyWindowId) -> Option<GewyWindow> {
+
+    /// Removes a window.
+    pub fn remove_window(&mut self, window_id: WindowId) -> Option<Window> {
         self.app.remove_window(window_id)
+    }
+
+    /// Creates a state object, returning its id.
+    pub fn create_state<S: Any>(&mut self, value: S) -> Id<S> {
+        self.app.store.create(value)
+    }
+
+    /// Creates a state object, returning its id.
+    pub fn init_state<S: Any + FromStore>(&mut self) -> Id<S> {
+        self.app.store.init()
+    }
+
+    /// Gets read-only access to the value of a state object.
+    pub fn state<S, I>(&self, state_id: I) -> &S
+    where
+        S: Any,
+        I: AsRef<Id<S>>,
+    {
+        self.app.store.get(state_id.as_ref())
+    }
+
+    /// Gets write access to the value of a state object.
+    pub fn state_mut<S, I>(&mut self, id: I) -> &mut S
+    where
+        S: Any,
+        I: AsRef<Id<S>>,
+    {
+        self.app.store.get_mut(id.as_ref())
     }
 }
 
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum GewyAppEvent { Start, Stop }
+pub enum AppEvent {
+    Start,
+    Stop,
+}

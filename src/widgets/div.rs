@@ -1,4 +1,4 @@
-use crate::{Class, WidgetId, Renderer, Widget};
+use crate::{Class, GewyString, View, Widget, WidgetId};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -13,12 +13,16 @@ pub struct Div {
 
 impl Widget for Div {
 
+    fn name(&self) -> GewyString { "div".into() }
+
+    fn disable_view(&self) -> bool { true }
+
     fn style(&self, style: &mut Style) {
         *style = self.style.clone();
     }
 
-    #[allow(unused)]
     fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {
+        if self.color.a == 0 { return };
         let rect = RoundedRect::new(
             layout.location.x as f64,
             layout.location.y as f64,
@@ -28,20 +32,18 @@ impl Widget for Div {
         );
         scene.fill(Fill::NonZero, affine, self.color, None, &rect);
     }
-
-    #[allow(unused)]
-    fn render(&self, r: &mut Renderer) {}
 }
 
 /// Widget function for [`Div`].
-pub fn div(class: impl Class<Div>, r: &mut Renderer) -> WidgetId {
+pub fn div(class: impl Class<Div>, v: &mut View) -> WidgetId {
     let div = class.produce();
-    r.insert(div)
+    v.insert(div)
 }
 
-pub fn div_begin(class: impl Class<Div>, r: &mut Renderer) -> WidgetId {
+/// Widget function for [`Div`].
+pub fn div_begin(class: impl Class<Div>, v: &mut View) -> WidgetId {
     let div = class.produce();
-    let id = r.insert(div);
-    r.begin();
+    let id = v.insert(div);
+    v.begin();
     id
 }

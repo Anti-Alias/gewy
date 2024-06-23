@@ -9,7 +9,7 @@ use crate::vello::glyph::Glyph;
 use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontQuery, GewyString, Renderer, ToGewyString, Widget, WidgetId};
+use crate::{Class, FontQuery, GewyString, View, ToGewyString, Widget, WidgetId};
 use crate::vello::Scene;
 
 /// A simple text [`Widget`](crate::Widget).
@@ -44,6 +44,10 @@ impl Default for Text {
 }
 
 impl Widget for Text {
+
+    fn name(&self) -> GewyString { "text".into() }
+
+    fn disable_view(&self) -> bool { true }
 
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
         match (known_size.width, available_space.width) {
@@ -127,11 +131,7 @@ pub enum TextAlign {
     Center,
 }
 
-pub fn text(
-    string: impl ToGewyString,
-    class: impl Class<Text>,
-    renderer: &mut Renderer
-) -> WidgetId {
+pub fn text(string: impl ToGewyString, class: impl Class<Text>, v: &mut View) -> WidgetId {
     // Configures text
     let mut text = Text {
         string: string.go_gewy_string(),
@@ -139,10 +139,10 @@ pub fn text(
     };
     class.apply(&mut text);
     // Finalizes text
-    let font = renderer.font_db().query(&text.font).clone();
+    let font = v.font_db().query(&text.font).clone();
     text._font = Some(font);
     // Inserts text
-    renderer.insert(text)
+    v.insert(text)
 }
 
 fn to_font_ref(font: &Font) -> Option<FontRef<'_>> {

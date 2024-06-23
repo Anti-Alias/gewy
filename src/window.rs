@@ -6,21 +6,84 @@ use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene}
 use wgpu::{Adapter, CompositeAlphaMode, Device, DeviceDescriptor, Instance, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureUsages};
 use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::ActiveEventLoop;
-use winit::window::{Window, WindowAttributes};
-use crate::{NodeTree, Widget};
+use winit::window::{Window as WinitWindow, WindowAttributes};
+use crate::{FontDB, RawId, InputEvent, Store, Widget, UI};
+
+/// A window within a [`GewyApp`](crate::GewyApp).
+/// Contains a [`Widget`] tree, acting as a user interface.
+pub struct Window {
+    pub(crate) content_width: u32,
+    pub(crate) content_height: u32,
+    pub(crate) ui: UI,                 // UI DOM
+    pub(crate) graphics: Option<WindowGraphics>,    // Graphical representation of window. Populated when window is created and when app is resumed (Android).
+}
+
+impl Window {
+    pub fn new(content_width: u32, content_height: u32, widget: impl Widget) -> Self {
+        Self {
+            content_width,
+            content_height,
+            ui: UI::new(widget),
+            graphics: None,
+        }
+    }
+
+    /// Width of the content of the window. Excludes borders.
+    pub fn content_width(&self) -> u32 { self.content_width }
+
+    /// Height of the content of the window.  Excludes borders.
+    pub fn content_height(&self) -> u32 { self.content_height }
+
+    pub(crate) fn resize(&mut self, width: u32, height: u32) {
+        self.ui.compute_layout(width as f32, height as f32);
+        self.content_width = width;
+        self.content_height = height;
+        if let Some(graphics) = &mut self.graphics {
+            graphics.resize(width, height);
+        }
+    }
+
+    pub(crate) fn render(&mut self, font_db: &FontDB, store: &Store) {
+        self.ui.render(font_db, store);
+    }
+
+    pub(crate) fn compute_layout(&mut self) {
+        self.ui.compute_layout(self.content_width as f32, self.content_height as f32);
+    }
+
+    pub(crate) fn paint(&mut self) {
+        let graphics = self.graphics.as_mut().expect("Window graphics not present");
+        graphics.paint(&self.ui);
+    }
+
+    pub fn fire_input_event(&mut self, event: InputEvent, store: &mut Store) {
+        self.ui.fire_input_event(event, store);
+    }
+
+    pub fn inform_state_changes(&mut self, state_ids: &[RawId], font_db: &FontDB, store: &Store) {
+        let num_updates = self.ui.inform_state_changes(state_ids);
+        if num_updates != 0 {
+            let root_id = self.ui.root_id();
+            self.ui.render(font_db, store);
+            self.ui.compute_layout_at(root_id, self.content_width as f32, self.content_height as f32);
+            let Some(graphics) = &mut self.graphics else { return };
+            graphics.winit_window.request_redraw();
+        }
+    }
+}
 
 /// Stores [`winit`] window and associated graphics state.
-pub(crate) struct GewyWindowView {
+pub(crate) struct WindowGraphics {
     pub device: Device,
     pub queue: Queue,
     pub surface: Surface<'static>,
     pub surface_config: SurfaceConfiguration,
-    winit_window: Pin<Box<Window>>,
+    winit_window: Pin<Box<WinitWindow>>,
     renderer: Renderer,
     scene: Scene,
 }
 
-impl GewyWindowView {
+impl WindowGraphics {
     pub fn new(
         instance: &Instance,
         content_width: u32,
@@ -66,11 +129,9 @@ impl GewyWindowView {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn paint(&mut self, node_tree: &NodeTree) {
-
+    pub fn paint(&mut self, node_tree: &UI) {
         self.scene.reset();
         node_tree.paint_root(&mut self.scene);
-
         let Ok(surface_texture) = self.surface.get_current_texture() else { return };
         self.renderer.render_to_surface(
             &self.device,
@@ -87,39 +148,14 @@ impl GewyWindowView {
         surface_texture.present();
     }
 
-    pub(crate) fn winit_window_id(&self) -> winit::window::WindowId {
+    pub(crate) fn winit_id(&self) -> winit::window::WindowId {
         self.winit_window.id()
     }
 }
 
 slotmap::new_key_type! {
-    pub struct GewyWindowId;
+    pub struct WindowId;
 }
-
-/// A window within a [`GewyApp`](crate::GewyApp).
-/// Contains a [`Widget`] tree, acting as a user interface.
-pub struct GewyWindow {
-    pub(crate) content_width: u32,
-    pub(crate) content_height: u32,
-    pub(crate) node_tree: NodeTree,             // UI DOM
-    pub(crate) view: Option<GewyWindowView>,    // Graphical representation of window. Stores GPU primitives.
-}
-
-impl GewyWindow {
-    pub fn new(content_width: u32, content_height: u32, widget: impl Widget) -> Self {
-        Self {
-            content_width,
-            content_height,
-            node_tree: NodeTree::new(widget),
-            view: None,
-        }
-    }
-    /// Width of the content of the window. Excludes borders.
-    pub fn content_width(&self) -> u32 { self.content_width }
-    /// Heightt of the content of the window.  Excludes borders.
-    pub fn content_height(&self) -> u32 { self.content_height }
-}
-
 
 fn create_surface_config(
     width: u32,

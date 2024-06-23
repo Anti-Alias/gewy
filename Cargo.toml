@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+downcast-rs = "1.2.1"
 env_logger = "0.11.3"
 log = "0.4.21"
 pollster = "0.3.0"
 slotmap = "1.0.7"
 smallvec = "1.13.2"
-taffy = "0.5.1"
+taffy = { path="../taffy" }
 vello = "0.2.0"
 wgpu = "0.20.1"
 winit = "0.30.1"

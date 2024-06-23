@@ -1,54 +1,122 @@
+use std::any::Any;
+
 use smallvec::SmallVec;
 use vello::Scene;
+use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{FontDB, WidgetId, NodeTree};
+use crate::{FontDB, FromStore, GewyString, Id, MouseButton, RawId, Store, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
 /// A paintable UI element in a [`NodeTree`].
 /// For instance, a text element, a div, a button etc.
 /// Wrapped in a [`Node`] when inserted in a [`NodeTree`] which grants it parent/child relationships with other [`Widget`]s in the tree.
-pub trait Widget: 'static {
+pub trait Widget: Downcast {
+
+    /// Display name of the widget.
+    fn name(&self) -> GewyString { "widget".into() }
 
     /// [`Style`] used for computing layouts.
     #[allow(unused)]
     fn style(&self, style: &mut Style) {}
+
 
     #[allow(unused)]
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
         Size::ZERO
     }
 
+    #[allow(unused)]
+    fn event(&self, event: WidgetEvent, ctx: EventCtx) -> bool { true }
+
+    fn state(&self) -> Option<RawId> { None }
+
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.
     #[allow(unused)]
     fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {}
 
+    /// If true, [`Widget::view`] will not be called after insertion.
+    fn disable_view(&self) -> bool { false }
+
     /// Renders descendant [`Widget`]s.
     #[allow(unused)]
-    fn render(&self, r: &mut Renderer) {}
+    fn view(&self, store: &Store, v: &mut View) {}
 }
 
-/// Builds the descendants of a [`Widget`] in its [`render`](Widget::render) method using the
-/// [`insert`](Self::insert), [`begin`](Self::begin) and [`end`](Self::end) methods.
-/// "Rendering" in this context means building a sub-tree of UI nodes.
-/// Internally, this is writing to a subtree of a [`NodeTree`].
-pub struct Renderer<'a> {
-    node_tree: &'a mut NodeTree,        // Tree being written to.
-    current: WidgetId,                  // "Current" widget. Calls to insert() will append children to this widget.
-    last: Option<WidgetId>,             // "Last" widget inserted as a child of the "current" widget.
-    ancestors: SmallVec<[WidgetId; 8]>, // Stack of ancestors to the "current" widget. Can include parent, grandparent, etc. If empty, calls to end() will panic.
-    font_db: &'a FontDB,                // Font DB reference. Used for widgets that paint text.
+impl_downcast!(Widget);
+
+
+pub struct EventCtx<'a> {
+    pub(crate) store: &'a mut Store,
 }
 
-impl<'a> Renderer<'a> {
+impl<'a> EventCtx<'a> {
+    
+    #[inline(always)]
+    pub fn create_state<S: Any>(&mut self, value: S) -> Id<S> {
+        self.store.create(value)
+    }
+
+    #[inline(always)]
+    pub fn init_state<S: Any + FromStore>(&mut self) -> Id<S> {
+        self.store.init()
+    }
+
+    /// Gets read-only access to the value of a state object.
+    pub fn state<S, I>(&self, state_id: I) -> &S
+    where
+        S: Any,
+        I: AsRef<Id<S>>,
+    {
+        self.store.get(state_id.as_ref())
+    }
+
+    /// Gets write access to the value of a state object.
+    pub fn state_mut<S, I>(&mut self, id: I) -> &mut S
+    where
+        S: Any,
+        I: AsRef<Id<S>>,
+    {
+        self.store.get_mut(id.as_ref())
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum WidgetEvent {
+    Pressed {
+        mouse_button: MouseButton,
+        mouse_x: f32,
+        mouse_y: f32,
+        width: f32,
+        height: f32,
+    },
+    Released {
+        mouse_button: MouseButton,
+        mouse_x: f32,
+        mouse_y: f32,
+        width: f32,
+        height: f32,
+    },
+}
+
+/// Utility used to build a tree of [`Widget`]s.
+pub struct View<'a> {
+    ui: &'a mut UI,
+    current: WidgetId,
+    last: Option<WidgetId>,
+    ancestors: SmallVec<[WidgetId; 8]>,
+    font_db: &'a FontDB,
+}
+
+impl<'a> View<'a> {
     pub(crate) fn new(
-        node_tree: &'a mut NodeTree,
+        ui: &'a mut UI,
         starting_node: WidgetId,
         font_db: &'a FontDB,
     ) -> Self {
         Self {
-            node_tree,
+            ui,
             current: starting_node,
             last: None,
             ancestors: SmallVec::new(),
@@ -59,9 +127,14 @@ impl<'a> Renderer<'a> {
     /// Inserts a widget node as a child of the "current" node.
     /// The inserted widget is considered the "last" node.
     pub fn insert(&mut self, widget: impl Widget) -> WidgetId {
-        let node_id = self.node_tree.insert(widget, self.current).unwrap();
+        let node_id = self.ui.insert(widget, self.current).unwrap();
         self.last = Some(node_id);
         node_id
+    }
+
+    /// Gets the id of the last [`Widget`] inserted.
+    pub fn last(&mut self) -> WidgetId {
+        self.last.unwrap()
     }
 
     /// Sets the "current" [`Widget`] to the last one inserted.
@@ -73,7 +146,6 @@ impl<'a> Renderer<'a> {
         };
         self.ancestors.push(self.current);
         self.current = last;
-        self.last = None;
     }
 
     /// Sets the "current" [`Widget`] to parent of the "current" [`Widget`].
@@ -91,16 +163,46 @@ impl<'a> Renderer<'a> {
     pub fn font_db(&self) -> &FontDB {
         &self.font_db
     }
+
+    /// Gets a [`Widget`] by id.
+    pub fn widget<W: Widget>(&self, widget_id: WidgetId) -> &W {
+        self.ui
+            .get(widget_id)
+            .and_then(|dyn_widget| dyn_widget.downcast_ref())
+            .unwrap()
+    }
+
+    /// Gets a [`Widget`] by id.
+    pub fn widget_mut<W: Widget>(&mut self, widget_id: WidgetId) -> &mut W {
+        self.ui
+            .get_mut(widget_id)
+            .and_then(|dyn_widget| dyn_widget.downcast_mut())
+            .unwrap()
+    }
+
+    /// Gets a [`Widget`] by id.
+    pub fn get_widget<W: Widget>(&self, widget_id: WidgetId) -> Option<&W> {
+        self.ui
+            .get(widget_id)
+            .and_then(|dyn_widget| dyn_widget.downcast_ref())
+    }
+
+    /// Gets a [`Widget`] by id.
+    pub fn get_widget_mut<W: Widget>(&mut self, widget_id: WidgetId) -> Option<&mut W> {
+        self.ui
+            .get_mut(widget_id)
+            .and_then(|dyn_widget| dyn_widget.downcast_mut())
+    }
 }
 
 /// DSL function that just calls [`begin`](UIRenderer::begin)
 #[inline(always)]
-pub fn begin(r: &mut Renderer) {
-    r.begin();
+pub fn begin(v: &mut View) {
+    v.begin();
 }
 
 /// DSL function that just calls [`end`](UIRenderer::end)
 #[inline(always)]
-pub fn end(r: &mut Renderer) {
-    r.end();
+pub fn end(v: &mut View) {
+    v.end();
 }
