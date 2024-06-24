@@ -163,9 +163,11 @@ impl ApplicationHandler<AppEvent> for AppListener {
         if !states_changed.is_empty() {
             for window in self.app.windows.values_mut() {
                 window.inform_state_changes(&states_changed, &self.app.font_db, &self.app.store);
-                //window.ui.print_diagnostics();
             }
         }
+
+        // Initializes graphics of windows if any new one was created
+        self.app.create_window_graphics(event_loop);
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {

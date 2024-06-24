@@ -1,6 +1,6 @@
 use gewy::kurbo::RoundedRectRadii;
 use gewy::peniko::Color;
-use gewy::{begin, button, button_begin, button_mut, div, div_begin, end, margin_all, nop_c, padding_all, pc, px, size_all, text, App, Button, Comp, Div, FontDB, FromStore, Id, Store, Text, ToGewyString, View, WidgetId, Window};
+use gewy::{button_begin, button_mut, div_begin, end, margin_all, nop_c, padding_all, pc, px, size_all, text, App, Button, Comp, Div, FontDB, FromStore, Id, Store, Text, ToGewyString, View, WidgetId, Window};
 use gewy::taffy::*;
 
 fn main() {
@@ -33,19 +33,14 @@ impl FromStore for AppState {
 fn app_fn(state: Id<AppState>, value: &AppState, v: &mut View) {
     let add_count = &mut WidgetId::default();
     let rem_count = &mut WidgetId::default();
-
+    
     for counter_state in &value.counters {
         counter(&counter_state, v);
     }
     div_begin(nop_c, v);
-        button_begin(button_c, add_count, v);
-            text("Add Counter", text_light_c, v);
-        end(v);
-        button_begin(button_c, rem_count, v);
-            text("Remove Counter", text_light_c, v);
-        end(v);
+        text_button("Add Counter", add_count, v);
+        text_button("Remove Counter", rem_count, v);
     end(v);
-
 
     let state_a = state.clone();
     button_mut(*add_count, v).release(move |ctx| {
@@ -73,8 +68,8 @@ fn counter_fn(state: Id<i32>, value: &i32, v: &mut View) {
     div_begin(c_counter_cont, v);
         text(count_text, text_dark_c, v);
         div_begin(inc_dec_c, v);
-            button_dark("+", inc, v);
-            button_dark("-", dec, v);
+            small_text_button("+", inc, v);
+            small_text_button("-", dec, v);
         end(v);
     end(v);
 
@@ -83,7 +78,13 @@ fn counter_fn(state: Id<i32>, value: &i32, v: &mut View) {
     button_mut(*dec, v).release(move |ctx| *ctx.state_mut(&state_a) -= 1);
 }
 
-fn button_dark(txt: impl ToGewyString, button_id: &mut WidgetId, v: &mut View) {
+fn text_button(txt: impl ToGewyString, button_id: &mut WidgetId, v: &mut View) {
+    button_begin(button_c, button_id, v);
+        text(txt, text_light_c, v);
+    end(v);
+}
+
+fn small_text_button(txt: impl ToGewyString, button_id: &mut WidgetId, v: &mut View) {
     button_begin(small_button_c, button_id, v);
         text(txt, text_light_c, v);
     end(v);

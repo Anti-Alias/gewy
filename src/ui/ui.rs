@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use taffy::{AvailableSpace, Size, TaffyTree, TraversePartialTree};
+use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
 use crate::{EventCtx, FontDB, InputEvent, MouseButton, RawId, Store, View, Widget, WidgetEvent};
 use crate::vello::Scene;
@@ -195,7 +195,7 @@ impl UI {
     }
 
     pub fn contains(&self, id: WidgetId) -> bool {
-        self.widgets.contains(id.0)
+        self.widgets.get_node_context(id.0).is_some()
     }
 
     /// Clears the descendants of a [`Widget`] (if any), then renders them.
@@ -247,10 +247,6 @@ impl UI {
             let measured_size = widget.measure(size, size_available);
             measured_size
         }).unwrap();
-    }
-
-    pub fn print_diagnostics(&self) {
-        self.widgets.print_diagnostics();
     }
 }
 

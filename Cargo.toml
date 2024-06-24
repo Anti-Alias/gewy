@@ -10,7 +10,7 @@ log = "0.4.21"
 pollster = "0.3.0"
 slotmap = "1.0.7"
 smallvec = "1.13.2"
-taffy = { path="../taffy" }
+taffy = "0.5.1"
 vello = "0.2.0"
 wgpu = "0.20.1"
 winit = "0.30.1"

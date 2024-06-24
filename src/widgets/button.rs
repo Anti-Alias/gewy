@@ -64,7 +64,6 @@ impl Widget for Button {
                     return false;
                 }
             },
-            _ => {}
         }
         true
     }
