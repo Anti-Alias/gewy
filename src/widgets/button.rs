@@ -1,4 +1,4 @@
-use crate::{Class, EventCtx, GewyString, MouseButton, View, Widget, WidgetEvent, WidgetId};
+use crate::{Class, EventCtx, GewyString, Listener, MouseButton, View, Widget, WidgetEvent, WidgetId};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -9,22 +9,11 @@ pub struct Button {
     pub style: Style,
     pub color: Color,
     pub radii: RoundedRectRadii,
-    pub press: Option<Box<dyn Fn(&mut EventCtx)>>,
-    pub release: Option<Box<dyn Fn(&mut EventCtx)>>,
+    pub listener: Option<Box<dyn Listener<ButtonEvent>>>,
 }
 
-impl Button {
-
-    pub fn press(&mut self, press: impl Fn(&mut EventCtx) + 'static) -> &mut Self {
-        self.press = Some(Box::new(press));
-        self
-    }
-
-    pub fn release(&mut self, release: impl Fn(&mut EventCtx) + 'static) -> &mut Self {
-        self.release = Some(Box::new(release));
-        self
-    }
-}
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum ButtonEvent { Pressed, Released }
 
 impl Widget for Button {
 
@@ -48,19 +37,19 @@ impl Widget for Button {
         scene.fill(Fill::NonZero, affine, self.color, None, &rect);
     }
 
-    fn event(&self, event: WidgetEvent, mut ctx: EventCtx) -> bool {
+    fn event(&self, event: WidgetEvent, ctx: EventCtx) -> bool {
         match event {
             WidgetEvent::Pressed { mouse_button, mouse_x, mouse_y, width, height } => {
-                let Some(press) = &self.press else { return true };
+                let Some(listener) = &self.listener else { return true };
                 if mouse_button == MouseButton::Left && mouse_x >= 0.0 && mouse_y >= 0.0 && mouse_x <= width && mouse_y <= height {
-                    press(&mut ctx);
+                    listener.handle(ButtonEvent::Pressed, ctx);
                     return false;
                 }
             },
             WidgetEvent::Released { mouse_button, mouse_x, mouse_y, width, height } => {
-                let Some(release) = &self.release else { return true };
+                let Some(listener) = &self.listener else { return true };
                 if mouse_button == MouseButton::Left && mouse_x >= 0.0 && mouse_y >= 0.0 && mouse_x <= width && mouse_y <= height {
-                    release(&mut ctx);
+                    listener.handle(ButtonEvent::Released, ctx);
                     return false;
                 }
             },
@@ -70,18 +59,26 @@ impl Widget for Button {
 }
 
 /// Widget function for [`Button`].
-pub fn button<'a>(class: impl Class<Button>, button_id: &mut WidgetId, v: &'a mut View) {
+pub fn button<'a>(class: impl Class<Button>, v: &'a mut View) {
     let button = class.produce();
-    let id = v.insert(button);
-    *button_id = id;
+    v.insert(button);
 }
 
 /// Widget function for [`Button`].
-pub fn button_begin<'a>(class: impl Class<Button>, button_id: &mut WidgetId, v: &'a mut View) {
-    let button = class.produce();
-    let id = v.insert(button);
+pub fn button_begin<'a>(
+    class: impl Class<Button>,
+    listener: impl Listener<ButtonEvent>,
+    v: &'a mut View
+) {
+    let mut button = Button {
+        style: Style::DEFAULT,
+        color: Color::rgba8(0, 0, 0, 0),
+        radii: RoundedRectRadii::default(),
+        listener: Some(Box::new(listener)),
+    };
+    class.apply(&mut button);
+    v.insert(button);
     v.begin();
-    *button_id = id;
 }
 
 /// Widget function to retrieve a [`Button`].

@@ -79,7 +79,7 @@ where
     fn view(&self, store: &Store, v: &mut View) {
         let state_value = store.get(&self.state);
         let view_fn = &self.view_fn;
-        view_fn.view(self.state.clone(), state_value, v);
+        view_fn.view(&self.state, state_value, v);
     }
 }
 
@@ -113,14 +113,14 @@ where
 
 /// A callback that builds the descendants of a [`Widget`] with respect to some state.
 pub trait StateViewFn<S: Any>: 'static {
-    fn view(&self, state: Id<S>, state_value: &S, view: &mut View);
+    fn view(&self, state: &Id<S>, state_value: &S, view: &mut View);
 }
 
 impl<S: Any, F> StateViewFn<S> for F
 where
-    F: Fn(Id<S>, &S, &mut View) + 'static,
+    F: Fn(&Id<S>, &S, &mut View) + 'static,
 {
-    fn view(&self, state: Id<S>, state_value: &S, view: &mut View) {
+    fn view(&self, state: &Id<S>, state_value: &S, view: &mut View) {
         self(state, state_value, view)
     }
 }

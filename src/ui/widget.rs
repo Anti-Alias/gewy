@@ -64,21 +64,19 @@ impl<'a> EventCtx<'a> {
     }
 
     /// Gets read-only access to the value of a state object.
-    pub fn state<S, I>(&self, state_id: I) -> &S
+    pub fn state<S>(&self, state_id: &Id<S>) -> &S
     where
         S: Any,
-        I: AsRef<Id<S>>,
     {
         self.store.get(state_id.as_ref())
     }
 
     /// Gets write access to the value of a state object.
-    pub fn state_mut<S, I>(&mut self, id: I) -> &mut S
+    pub fn state_mut<S>(&mut self, id: &Id<S>) -> &mut S
     where
         S: Any,
-        I: AsRef<Id<S>>,
     {
-        self.store.get_mut(id.as_ref())
+        self.store.get_mut(id)
     }
 }
 
@@ -205,4 +203,33 @@ pub fn begin(v: &mut View) {
 #[inline(always)]
 pub fn end(v: &mut View) {
     v.end();
+}
+
+
+/// Any type that reacts to an event on a [`Widget`].
+pub trait Listener<E>: 'static {
+    fn handle(&self, event: E, ctx: EventCtx);
+}
+
+impl<E, F> Listener<E> for F
+where
+    F: Fn(E, EventCtx) + 'static
+{
+    fn handle(&self, event: E, ctx: EventCtx) {
+        self(event, ctx);
+    }
+}
+
+/// A helper function that creates a listener from a callback function.
+pub fn listener<E, S, C>(event: E, id: &Id<S>, callback: C) -> impl Listener<E>
+where
+    E: PartialEq + 'static,
+    S: Any,
+    C: Fn(&Id<S>, &mut EventCtx) + 'static,
+{
+    let id = id.clone();
+    move |evt: E, mut ctx: EventCtx| {
+        if event != evt { return }
+        callback(&id, &mut ctx);
+    }
 }

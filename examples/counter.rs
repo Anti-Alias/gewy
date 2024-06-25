@@ -1,6 +1,6 @@
 use gewy::kurbo::RoundedRectRadii;
 use gewy::peniko::Color;
-use gewy::{button_begin, button_mut, div_begin, end, margin_all, nop_c, padding_all, pc, px, size_all, text, App, Button, Comp, Div, FontDB, FromStore, Id, Store, Text, ToGewyString, View, WidgetId, Window};
+use gewy::*;
 use gewy::taffy::*;
 
 fn main() {
@@ -13,6 +13,7 @@ fn main() {
         let app_widget_2 = Comp::new(app_state, app_c, app_fn);
         ctx.add_window(Window::new(512, 512, app_widget_1));
         ctx.add_window(Window::new(512, 512, app_widget_2));
+        
     });
 }
 
@@ -30,41 +31,33 @@ impl FromStore for AppState {
 
 // --------------- Widget functions --------------- 
 
-fn app_fn(state: Id<AppState>, value: &AppState, v: &mut View) {
-    let add_count = &mut WidgetId::default();
-    let rem_count = &mut WidgetId::default();
-    
-    for counter_state in &value.counters {
-        counter(&counter_state, v);
-    }
-    div_begin(nop_c, v);
-        text_button("Add Counter", add_count, v);
-        text_button("Remove Counter", rem_count, v);
-    end(v);
-
-    let state_a = state.clone();
-    button_mut(*add_count, v).release(move |ctx| {
-        let counter_state = ctx.init_state::<i32>();
-        let value = ctx.state_mut(&state_a);
-        value.counters.push(counter_state);
+fn app_fn(id: &Id<AppState>, value: &AppState, v: &mut View) {
+    let add_listener = listener(ButtonEvent::Released, id, |id, ctx| {
+        let counter_id = ctx.init_state::<i32>();
+        ctx.state_mut(id).counters.push(counter_id);
     });
-    button_mut(*rem_count, v).release(move |ctx| {
-        let value = ctx.state_mut(&state);
+    let rem_listener = listener(ButtonEvent::Released, id, |id, ctx| {
+        let value = ctx.state_mut(id);
         value.counters.pop();
     });
+    for counter_id in &value.counters {
+        counter(counter_id, v);
+    }
+    div_begin(nop_c, v);
+        text_button("Add Counter", add_listener, v);
+        text_button("Remove Counter", rem_listener, v);
+    end(v);
 }
 
-fn counter(state: &Id<i32>, v: &mut View) {
-    let counter_widget = Comp::new(state.clone(), counter_c, counter_fn);
+fn counter(id: &Id<i32>, v: &mut View) {
+    let counter_widget = Comp::new(id.clone(), counter_c, counter_fn);
     v.insert(counter_widget);
 }
 
-fn counter_fn(state: Id<i32>, value: &i32, v: &mut View) {
-    let value = *value;
+fn counter_fn(id: &Id<i32>, value: &i32, v: &mut View) {
     let count_text = format!("Count: {value}");
-    let inc = &mut WidgetId::default();
-    let dec = &mut WidgetId::default();
-
+    let inc = listener(ButtonEvent::Released, id, |id, ctx| *ctx.state_mut(id) += 1);
+    let dec = listener(ButtonEvent::Released, id, |id, ctx| *ctx.state_mut(id) -= 1);
     div_begin(c_counter_cont, v);
         text(count_text, text_dark_c, v);
         div_begin(inc_dec_c, v);
@@ -72,20 +65,24 @@ fn counter_fn(state: Id<i32>, value: &i32, v: &mut View) {
             small_text_button("-", dec, v);
         end(v);
     end(v);
-
-    let state_a = state.clone();
-    button_mut(*inc, v).release(move |ctx| *ctx.state_mut(&state) += 1);
-    button_mut(*dec, v).release(move |ctx| *ctx.state_mut(&state_a) -= 1);
 }
 
-fn text_button(txt: impl ToGewyString, button_id: &mut WidgetId, v: &mut View) {
-    button_begin(button_c, button_id, v);
+fn text_button(
+    txt: impl ToGewyString,
+    listener: impl Listener<ButtonEvent>,
+    v: &mut View
+) {
+    button_begin(button_c, listener, v);
         text(txt, text_light_c, v);
     end(v);
 }
 
-fn small_text_button(txt: impl ToGewyString, button_id: &mut WidgetId, v: &mut View) {
-    button_begin(small_button_c, button_id, v);
+fn small_text_button(
+    txt: impl ToGewyString,
+    listener: impl Listener<ButtonEvent>,
+    v: &mut View
+) {
+    button_begin(small_button_c, listener, v);
         text(txt, text_light_c, v);
     end(v);
 }
