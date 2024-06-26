@@ -1,6 +1,4 @@
-use std::any::Any;
-
-use crate::{Class, GewyString, RawId, Id, Store, View, Widget, WidgetId};
+use crate::{Class, GewyString, Handle, Id, RawId, State, Store, View, Widget, WidgetId};
 use crate::taffy::Style;
 
 /// An inline [`Widget`] not bound to any state.
@@ -49,17 +47,17 @@ where
 /// Useful as a "root widget" in an application.
 pub struct Comp<S, V>
 where
-    S: 'static,
+    S: State,
     V: StateViewFn<S>,
 {
     pub style: Style,
-    pub state: Id<S>,
+    pub state_handle: Handle<S>,
     pub view_fn: V,
 }
 
 impl<S, V> Widget for Comp<S, V>
 where
-    S: 'static,
+    S: State,
     V: StateViewFn<S>,
 {
 
@@ -71,27 +69,26 @@ where
         *style = self.style.clone();
     }
 
-    fn state(&self) -> Option<RawId> {
-        Some(self.state.handle)
+    fn state_id(&self) -> Option<RawId> {
+        Some(self.state_handle.id().raw())
     }
 
     #[allow(unused)]
     fn view(&self, store: &Store, v: &mut View) {
-        let state_value = store.get(&self.state);
         let view_fn = &self.view_fn;
-        view_fn.view(&self.state, state_value, v);
+        view_fn.view(self.state_handle.id(), store, v);
     }
 }
 
 impl<S, V> Comp<S, V>
 where
-    S: 'static,
+    S: State,
     V: StateViewFn<S>,
 {
-    pub fn new(state: Id<S>, class: impl Class<Style>, view_fn: V) -> Self {
+    pub fn new(state_handle: Handle<S>, class: impl Class<Style>, view_fn: V) -> Self {
         Self {
             style: class.produce(),
-            state,
+            state_handle,
             view_fn,
         }
     }
@@ -112,34 +109,34 @@ where
 }
 
 /// A callback that builds the descendants of a [`Widget`] with respect to some state.
-pub trait StateViewFn<S: Any>: 'static {
-    fn view(&self, state: &Id<S>, state_value: &S, view: &mut View);
+pub trait StateViewFn<S: State>: 'static {
+    fn view(&self, state_id: Id<S>, store: &Store, view: &mut View);
 }
 
-impl<S: Any, F> StateViewFn<S> for F
+impl<S: State, F> StateViewFn<S> for F
 where
-    F: Fn(&Id<S>, &S, &mut View) + 'static,
+    F: Fn(Id<S>, &Store, &mut View) + 'static,
 {
-    fn view(&self, state: &Id<S>, state_value: &S, view: &mut View) {
-        self(state, state_value, view)
+    fn view(&self, id: Id<S>, store: &Store, view: &mut View) {
+        self(id, store, view)
     }
 }
 
 
 /// Insertion function for a [`Component`].
 pub fn comp<S, V>(
-    state: Id<S>,
+    state_handle: Handle<S>,
     class: impl Class<Style>,
     view: &mut View,
     view_fn: V,
 ) -> WidgetId
 where
-    S: 'static,
+    S: State,
     V: StateViewFn<S>,
 {
     view.insert(Comp {
         style: class.produce(),
-        state,
+        state_handle,
         view_fn,
     })
 }

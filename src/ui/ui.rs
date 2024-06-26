@@ -40,7 +40,7 @@ impl UI {
         let root_widget_style = style_of(&root_widget);
         let root_widget: Box<dyn Widget> = Box::new(root_widget);
         let mut widgets = TaffyTree::new();
-        let state_id = root_widget.state();
+        let state_id = root_widget.state_id();
         let root_id = widgets.new_leaf_with_context(root_widget_style, root_widget).unwrap();
         let root_id = WidgetId(root_id);
         let mut result = Self {
@@ -71,7 +71,7 @@ impl UI {
     }
 
     pub fn insert(&mut self, widget: impl Widget, parent_id: WidgetId) -> Option<WidgetId> {
-        let state_id = widget.state();
+        let state_id = widget.state_id();
         let disable_view = widget.disable_view();
         let widget_style = style_of(&widget);
         let widget_id = self.widgets.new_leaf_with_context(widget_style, Box::new(widget)).unwrap();

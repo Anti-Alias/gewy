@@ -5,43 +5,65 @@ use gewy::taffy::*;
 
 fn main() {
     env_logger::init();
-    let font_db = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
-
-    App::new(font_db).start(|ctx| {
-        let app_state = ctx.init_state::<AppState>();
-        let app_widget_1 = Comp::new(app_state.clone(), app_c, app_fn);
-        let app_widget_2 = Comp::new(app_state, app_c, app_fn);
-        ctx.add_window(Window::new(512, 512, app_widget_1));
-        ctx.add_window(Window::new(512, 512, app_widget_2));
+    let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
+    App::new(fonts).start(|ctx| {
+        let app_handle: Handle<AppState> = ctx.init_state();
+        let app_widget = Comp::new(app_handle, app_c, app_fn);
+        ctx.add_window(Window::new(512, 512, app_widget));
         
     });
 }
 
 pub struct AppState {
-    counters: Vec<Id<i32>>,
+    counters: Vec<Handle<CounterState>>,
+}
+
+impl State for AppState {
+    fn bind(&self, bindings: &mut StateBindings) {
+        for counter in &self.counters {
+            bindings.add(counter);
+        }
+    }
 }
 
 impl FromStore for AppState {
     fn from_store(store: &mut Store) -> Self {
         Self {
-            counters: vec![ store.create(0) ],
+            counters: vec![ store.init() ],
         }
     }
 }
 
-// --------------- Widget functions --------------- 
+#[derive(Default)]
+pub struct CounterState(i32);
+impl State for CounterState {}
 
-fn app_fn(id: &Id<AppState>, value: &AppState, v: &mut View) {
-    let add_listener = listener(ButtonEvent::Released, id, |id, ctx| {
-        let counter_id = ctx.init_state::<i32>();
-        ctx.state_mut(id).counters.push(counter_id);
-    });
-    let rem_listener = listener(ButtonEvent::Released, id, |id, ctx| {
-        let value = ctx.state_mut(id);
-        value.counters.pop();
-    });
-    for counter_id in &value.counters {
-        counter(counter_id, v);
+
+// --------------- Widget functions --------------- 
+fn app_fn(id: Id<AppState>, store: &Store, v: &mut View) {
+    let add_listener = move |evt: ButtonEvent, mut ctx: EventCtx| {
+        if evt != ButtonEvent::Released { return };
+        let counter_handle = ctx.init_state::<CounterState>();
+        let state = ctx.state_mut(id);
+        state.counters.push(counter_handle);
+    };
+    let rem_listener = move |evt: ButtonEvent, mut ctx: EventCtx| {
+        if evt != ButtonEvent::Released { return };
+        let state = ctx.state_mut(id);
+        state.counters.pop();
+    };
+    let state = store.get(id);
+
+    let counter_sum: i32 = state.counters.iter()
+        .map(|handle| store.get(handle.id()))
+        .map(|state| state.0)
+        .sum();
+    if counter_sum >= 10 {
+        text("That's a lot of handles!", (), v);
+    }
+
+    for counter_handle in &state.counters {
+        counter(counter_handle, v);
     }
     div_begin(nop_c, v);
         text_button("Add Counter", add_listener, v);
@@ -49,15 +71,24 @@ fn app_fn(id: &Id<AppState>, value: &AppState, v: &mut View) {
     end(v);
 }
 
-fn counter(id: &Id<i32>, v: &mut View) {
-    let counter_widget = Comp::new(id.clone(), counter_c, counter_fn);
+fn counter(handle: &Handle<CounterState>, v: &mut View) {
+    let counter_widget = Comp::new(handle.clone(), counter_c, counter_fn);
     v.insert(counter_widget);
 }
 
-fn counter_fn(id: &Id<i32>, value: &i32, v: &mut View) {
-    let count_text = format!("Count: {value}");
-    let inc = listener(ButtonEvent::Released, id, |id, ctx| *ctx.state_mut(id) += 1);
-    let dec = listener(ButtonEvent::Released, id, |id, ctx| *ctx.state_mut(id) -= 1);
+fn counter_fn(id: Id<CounterState>, store: &Store, v: &mut View) {
+    let state = store.get(id);
+    let count_text = format!("Count: {}", state.0);
+    let inc = move |evt: ButtonEvent, mut ctx: EventCtx| {
+        if evt != ButtonEvent::Released { return };
+        let state = ctx.state_mut(id);
+        state.0 += 1;
+    };
+    let dec = move |evt: ButtonEvent, mut ctx: EventCtx| {
+        if evt != ButtonEvent::Released { return };
+        let state = ctx.state_mut(id);
+        state.0 -= 1;
+    };
     div_begin(c_counter_cont, v);
         text(count_text, text_dark_c, v);
         div_begin(inc_dec_c, v);

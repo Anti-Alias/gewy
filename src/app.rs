@@ -6,7 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId as WinitWindowId;
-use crate::{FontDB, FromStore, Id, InputEvent, Store, Window, WindowGraphics, WindowId};
+use crate::{FontDB, FromStore, Handle, Id, InputEvent, State, Store, Window, WindowGraphics, WindowId};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct App {
@@ -198,31 +198,29 @@ impl<'a> AppCtx<'a> {
     }
 
     /// Creates a state object, returning its id.
-    pub fn create_state<S: Any>(&mut self, value: S) -> Id<S> {
+    pub fn create_state<S: State>(&mut self, value: S) -> Handle<S> {
         self.app.store.create(value)
     }
 
     /// Creates a state object, returning its id.
-    pub fn init_state<S: Any + FromStore>(&mut self) -> Id<S> {
+    pub fn init_state<S: State + FromStore>(&mut self) -> Handle<S> {
         self.app.store.init()
     }
 
     /// Gets read-only access to the value of a state object.
-    pub fn state<S, I>(&self, state_id: I) -> &S
+    pub fn state<S, I>(&self, id: Id<S>) -> &S
     where
-        S: Any,
-        I: AsRef<Id<S>>,
+        S: State,
     {
-        self.app.store.get(state_id.as_ref())
+        self.app.store.get(id)
     }
 
     /// Gets write access to the value of a state object.
-    pub fn state_mut<S, I>(&mut self, id: I) -> &mut S
+    pub fn state_mut<S, I>(&mut self, id: Id<S>) -> &mut S
     where
-        S: Any,
-        I: AsRef<Id<S>>,
+        S: State,
     {
-        self.app.store.get_mut(id.as_ref())
+        self.app.store.get_mut(id)
     }
 }
 

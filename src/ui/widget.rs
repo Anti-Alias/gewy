@@ -1,10 +1,8 @@
-use std::any::Any;
-
 use smallvec::SmallVec;
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{FontDB, FromStore, GewyString, Id, MouseButton, RawId, Store, WidgetId, UI};
+use crate::{FontDB, FromStore, GewyString, Handle, Id, MouseButton, RawId, State, Store, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -29,7 +27,7 @@ pub trait Widget: Downcast {
     #[allow(unused)]
     fn event(&self, event: WidgetEvent, ctx: EventCtx) -> bool { true }
 
-    fn state(&self) -> Option<RawId> { None }
+    fn state_id(&self) -> Option<RawId> { None }
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.
@@ -54,27 +52,27 @@ pub struct EventCtx<'a> {
 impl<'a> EventCtx<'a> {
     
     #[inline(always)]
-    pub fn create_state<S: Any>(&mut self, value: S) -> Id<S> {
+    pub fn create_state<S: State>(&mut self, value: S) -> Handle<S> {
         self.store.create(value)
     }
 
     #[inline(always)]
-    pub fn init_state<S: Any + FromStore>(&mut self) -> Id<S> {
+    pub fn init_state<S: State + FromStore>(&mut self) -> Handle<S> {
         self.store.init()
     }
 
     /// Gets read-only access to the value of a state object.
-    pub fn state<S>(&self, state_id: &Id<S>) -> &S
+    pub fn state<S>(&self, id: Id<S>) -> &S
     where
-        S: Any,
+        S: State,
     {
-        self.store.get(state_id.as_ref())
+        self.store.get(id)
     }
 
     /// Gets write access to the value of a state object.
-    pub fn state_mut<S>(&mut self, id: &Id<S>) -> &mut S
+    pub fn state_mut<S>(&mut self, id: Id<S>) -> &mut S
     where
-        S: Any,
+        S: State,
     {
         self.store.get_mut(id)
     }
@@ -221,15 +219,13 @@ where
 }
 
 /// A helper function that creates a listener from a callback function.
-pub fn listener<E, S, C>(event: E, id: &Id<S>, callback: C) -> impl Listener<E>
+pub fn listener<E, C>(event: E, callback: C) -> impl Listener<E>
 where
     E: PartialEq + 'static,
-    S: Any,
-    C: Fn(&Id<S>, &mut EventCtx) + 'static,
+    C: Fn(&mut EventCtx) + 'static,
 {
-    let id = id.clone();
     move |evt: E, mut ctx: EventCtx| {
         if event != evt { return }
-        callback(&id, &mut ctx);
+        callback(&mut ctx);
     }
 }
