@@ -9,7 +9,7 @@ use crate::vello::glyph::Glyph;
 use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontQuery, GewyString, View, ToGewyString, Widget, WidgetId};
+use crate::{Class, FontQuery, GewyString, ToGewyString, View, Widget, WidgetId};
 use crate::vello::Scene;
 
 /// A simple text [`Widget`](crate::Widget).
@@ -131,7 +131,7 @@ pub enum TextAlign {
     Center,
 }
 
-pub fn text(string: impl ToGewyString, class: impl Class<Text>, v: &mut View) -> WidgetId {
+pub fn text(string: impl ToGewyString, class: impl Class<Text>, v: &mut View) -> WidgetId<Text> {
     // Configures text
     let mut text = Text {
         string: string.go_gewy_string(),

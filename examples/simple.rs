@@ -5,27 +5,27 @@ use gewy::taffy::*;
 
 fn main() {
     env_logger::init();
-    let font_db = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
-    App::new(font_db).start(|ctx| {
-        let app_widget = Wid::new(app_view, app_c);
-        ctx.add_window(Window::new(512, 512, app_widget));
+    let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
+    App::new(fonts).start(|ctx| {
+        let widget = Wid::new(simple_fn, simple_cls);
+        ctx.add_window(Window::new(512, 512, widget));
     });
 }
 
-// View function that produces a widget tree.
-fn app_view(v: &mut View) {
-    div(red_c, v);
-    div_begin(gray_c, v);
-        div(green_c, v);
-        text("This is some text!", text_c, v);
-        div(yellow_c, v);
+// View function
+fn simple_fn(v: &mut View) {
+    div(red_cls, v);
+    div_begin(gray_cls, v);
+        div(green_cls, v);
+        text("This is some text!", text_cls, v);
+        div(yellow_cls, v);
     end(v);
-    div(blue_c, v);
+    div(blue_cls, v);
 }
 
 
-// "Classes" are just callback functions that externalize widget configuration
-fn app_c(s: &mut Style) {
+// ---------- Class functions ----------
+fn simple_cls(s: &mut Style) {
     s.size.width = pc(1.0);
     s.size.height = pc(1.0);
     s.flex_direction = FlexDirection::Column;
@@ -33,18 +33,18 @@ fn app_c(s: &mut Style) {
     s.align_items = Some(AlignItems::Center);
 }
 
-fn text_c(t: &mut Text) {
+fn text_cls(t: &mut Text) {
     t.color = Color::BLACK;
     t.text_align = TextAlign::Center;
 }
 
-fn red_c(d: &mut Div) {
+fn red_cls(d: &mut Div) {
     d.radii = RoundedRectRadii::from_single_radius(5.0);
     d.style.size = size_all(px(32));
     d.color = Color::RED;
 }
 
-fn yellow_c(d: &mut Div) {
+fn yellow_cls(d: &mut Div) {
     let s = &mut d.style;
     d.radii = RoundedRectRadii::from_single_radius(5.0);
     d.color = Color::YELLOW;
@@ -53,20 +53,20 @@ fn yellow_c(d: &mut Div) {
     s.size = size_all(px(32));
 }
 
-fn green_c(d: &mut Div) {
+fn green_cls(d: &mut Div) {
     d.radii = RoundedRectRadii::from_single_radius(5.0);
     d.style.size = size_all(px(32));
     d.color = Color::GREEN;
     d.style.margin = margin_all(px(5));
 }
 
-fn blue_c(d: &mut Div) {
+fn blue_cls(d: &mut Div) {
     d.radii = RoundedRectRadii::from_single_radius(5.0);
     d.style.size = size_all(px(32));
     d.color = Color::BLUE;
 }
 
-fn gray_c(d: &mut Div) {
+fn gray_cls(d: &mut Div) {
     let s = &mut d.style;
     d.radii = RoundedRectRadii::from_single_radius(20.0);
     d.color = Color::GRAY;

@@ -122,6 +122,23 @@ where
     }
 }
 
+/// Creates a [`StateViewFn`] using a callback.
+#[inline(always)]
+pub fn state_view_fn<P, C, S>(
+    params: P,
+    callback: C,
+) -> impl StateViewFn<S>
+where
+    P: Clone + 'static,
+    C: Fn(Id<S>, &Store, P, &mut View) + 'static,
+    S: State,
+{
+    move |id: Id<S>, store: &Store, view: &mut View| {
+        let params = params.clone();
+        callback(id, store, params, view);
+    }
+}
+
 
 /// Insertion function for a [`Component`].
 pub fn comp<S, V>(
@@ -129,7 +146,7 @@ pub fn comp<S, V>(
     class: impl Class<Style>,
     view: &mut View,
     view_fn: V,
-) -> WidgetId
+) -> WidgetId<Comp<S, V>>
 where
     S: State,
     V: StateViewFn<S>,

@@ -1,3 +1,5 @@
+use taffy::FlexDirection;
+
 use crate::{Class, GewyString, View, Widget, WidgetId};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
@@ -35,15 +37,46 @@ impl Widget for Div {
 }
 
 /// Widget function for [`Div`].
-pub fn div(class: impl Class<Div>, v: &mut View) -> WidgetId {
+pub fn div(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
     let div = class.produce();
     v.insert(div)
 }
 
 /// Widget function for [`Div`].
-pub fn div_begin(class: impl Class<Div>, v: &mut View) -> WidgetId {
+pub fn div_begin(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
     let div = class.produce();
     let id = v.insert(div);
+    v.begin();
+    id
+}
+
+/// Displays contents left to right. Alias for [`div`].
+#[inline(always)]
+pub fn row(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
+    div(class, v)
+}
+
+/// Displays contents left to right. Alias for [`div_begin`].
+#[inline(always)]
+pub fn row_begin(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
+    div_begin(class, v)
+}
+
+/// Alias for [`div`]. Displays contents top to bottom.
+pub fn col(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
+    let mut d = Div::default();
+    class.apply(&mut d);
+    d.style.flex_direction = FlexDirection::Column;
+    v.insert(d)
+}
+
+/// Alias for [`div_begin`]. Displays contents top to bottom.
+#[inline(always)]
+pub fn col_begin(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
+    let mut d = Div::default();
+    class.apply(&mut d);
+    d.style.flex_direction = FlexDirection::Column;
+    let id = v.insert(d);
     v.begin();
     id
 }

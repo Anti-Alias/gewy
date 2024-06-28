@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{FontDB, FromStore, GewyString, Handle, Id, MouseButton, RawId, State, Store, WidgetId, UI};
+use crate::{FontDB, GewyString, MouseButton, RawId, RawWidgetId, Store, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -46,36 +46,7 @@ impl_downcast!(Widget);
 
 
 pub struct EventCtx<'a> {
-    pub(crate) store: &'a mut Store,
-}
-
-impl<'a> EventCtx<'a> {
-    
-    #[inline(always)]
-    pub fn create_state<S: State>(&mut self, value: S) -> Handle<S> {
-        self.store.create(value)
-    }
-
-    #[inline(always)]
-    pub fn init_state<S: State + FromStore>(&mut self) -> Handle<S> {
-        self.store.init()
-    }
-
-    /// Gets read-only access to the value of a state object.
-    pub fn state<S>(&self, id: Id<S>) -> &S
-    where
-        S: State,
-    {
-        self.store.get(id)
-    }
-
-    /// Gets write access to the value of a state object.
-    pub fn state_mut<S>(&mut self, id: Id<S>) -> &mut S
-    where
-        S: State,
-    {
-        self.store.get_mut(id)
-    }
+    pub store: &'a mut Store,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -99,16 +70,16 @@ pub enum WidgetEvent {
 /// Utility used to build a tree of [`Widget`]s.
 pub struct View<'a> {
     ui: &'a mut UI,
-    current: WidgetId,
-    last: Option<WidgetId>,
-    ancestors: SmallVec<[WidgetId; 8]>,
+    current: RawWidgetId,
+    last: Option<RawWidgetId>,
+    ancestors: SmallVec<[RawWidgetId; 8]>,
     font_db: &'a FontDB,
 }
 
 impl<'a> View<'a> {
     pub(crate) fn new(
         ui: &'a mut UI,
-        starting_node: WidgetId,
+        starting_node: RawWidgetId,
         font_db: &'a FontDB,
     ) -> Self {
         Self {
@@ -122,14 +93,14 @@ impl<'a> View<'a> {
 
     /// Inserts a widget node as a child of the "current" node.
     /// The inserted widget is considered the "last" node.
-    pub fn insert(&mut self, widget: impl Widget) -> WidgetId {
-        let node_id = self.ui.insert(widget, self.current).unwrap();
-        self.last = Some(node_id);
-        node_id
+    pub fn insert<W: Widget>(&mut self, widget: W) -> WidgetId<W> {
+        let widget_id = self.ui.insert(widget, self.current).unwrap();
+        self.last = Some(widget_id);
+        WidgetId::new(widget_id)
     }
 
     /// Gets the id of the last [`Widget`] inserted.
-    pub fn last(&mut self) -> WidgetId {
+    pub fn last(&mut self) -> RawWidgetId {
         self.last.unwrap()
     }
 
@@ -161,7 +132,7 @@ impl<'a> View<'a> {
     }
 
     /// Gets a [`Widget`] by id.
-    pub fn widget<W: Widget>(&self, widget_id: WidgetId) -> &W {
+    pub fn widget<W: Widget>(&self, widget_id: RawWidgetId) -> &W {
         self.ui
             .get(widget_id)
             .and_then(|dyn_widget| dyn_widget.downcast_ref())
@@ -169,7 +140,7 @@ impl<'a> View<'a> {
     }
 
     /// Gets a [`Widget`] by id.
-    pub fn widget_mut<W: Widget>(&mut self, widget_id: WidgetId) -> &mut W {
+    pub fn widget_mut<W: Widget>(&mut self, widget_id: RawWidgetId) -> &mut W {
         self.ui
             .get_mut(widget_id)
             .and_then(|dyn_widget| dyn_widget.downcast_mut())
@@ -177,55 +148,26 @@ impl<'a> View<'a> {
     }
 
     /// Gets a [`Widget`] by id.
-    pub fn get_widget<W: Widget>(&self, widget_id: WidgetId) -> Option<&W> {
+    pub fn get_widget<W: Widget>(&self, widget_id: RawWidgetId) -> Option<&W> {
         self.ui
             .get(widget_id)
             .and_then(|dyn_widget| dyn_widget.downcast_ref())
     }
 
     /// Gets a [`Widget`] by id.
-    pub fn get_widget_mut<W: Widget>(&mut self, widget_id: WidgetId) -> Option<&mut W> {
+    pub fn get_widget_mut<W: Widget>(&mut self, widget_id: RawWidgetId) -> Option<&mut W> {
         self.ui
             .get_mut(widget_id)
             .and_then(|dyn_widget| dyn_widget.downcast_mut())
     }
 }
 
-/// DSL function that just calls [`begin`](UIRenderer::begin)
 #[inline(always)]
 pub fn begin(v: &mut View) {
     v.begin();
 }
 
-/// DSL function that just calls [`end`](UIRenderer::end)
 #[inline(always)]
 pub fn end(v: &mut View) {
     v.end();
-}
-
-
-/// Any type that reacts to an event on a [`Widget`].
-pub trait Listener<E>: 'static {
-    fn handle(&self, event: E, ctx: EventCtx);
-}
-
-impl<E, F> Listener<E> for F
-where
-    F: Fn(E, EventCtx) + 'static
-{
-    fn handle(&self, event: E, ctx: EventCtx) {
-        self(event, ctx);
-    }
-}
-
-/// A helper function that creates a listener from a callback function.
-pub fn listener<E, C>(event: E, callback: C) -> impl Listener<E>
-where
-    E: PartialEq + 'static,
-    C: Fn(&mut EventCtx) + 'static,
-{
-    move |evt: E, mut ctx: EventCtx| {
-        if event != evt { return }
-        callback(&mut ctx);
-    }
 }

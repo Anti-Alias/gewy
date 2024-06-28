@@ -37,19 +37,19 @@ impl Widget for Button {
         scene.fill(Fill::NonZero, affine, self.color, None, &rect);
     }
 
-    fn event(&self, event: WidgetEvent, ctx: EventCtx) -> bool {
+    fn event(&self, event: WidgetEvent, mut ctx: EventCtx) -> bool {
         match event {
             WidgetEvent::Pressed { mouse_button, mouse_x, mouse_y, width, height } => {
                 let Some(listener) = &self.listener else { return true };
                 if mouse_button == MouseButton::Left && mouse_x >= 0.0 && mouse_y >= 0.0 && mouse_x <= width && mouse_y <= height {
-                    listener.handle(ButtonEvent::Pressed, ctx);
+                    listener.handle(ButtonEvent::Pressed, &mut ctx);
                     return false;
                 }
             },
             WidgetEvent::Released { mouse_button, mouse_x, mouse_y, width, height } => {
                 let Some(listener) = &self.listener else { return true };
                 if mouse_button == MouseButton::Left && mouse_x >= 0.0 && mouse_y >= 0.0 && mouse_x <= width && mouse_y <= height {
-                    listener.handle(ButtonEvent::Released, ctx);
+                    listener.handle(ButtonEvent::Released, &mut ctx);
                     return false;
                 }
             },
@@ -59,9 +59,9 @@ impl Widget for Button {
 }
 
 /// Widget function for [`Button`].
-pub fn button<'a>(class: impl Class<Button>, v: &'a mut View) {
+pub fn button(class: impl Class<Button>, v: &mut View) -> WidgetId<Button> {
     let button = class.produce();
-    v.insert(button);
+    v.insert(button)
 }
 
 /// Widget function for [`Button`].
@@ -79,9 +79,4 @@ pub fn button_begin<'a>(
     class.apply(&mut button);
     v.insert(button);
     v.begin();
-}
-
-/// Widget function to retrieve a [`Button`].
-pub fn button_mut<'a>(widget_id: WidgetId, v: &'a mut View) -> &'a mut Button {
-    v.widget_mut(widget_id)
 }

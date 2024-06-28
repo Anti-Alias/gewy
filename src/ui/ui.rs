@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
@@ -7,17 +8,41 @@ use crate::vello::Scene;
 use crate::taffy::Style;
 
 
-/// ID of a [`Widget`](crate::Widget).
+/// Typed Id of a [`Widget`](crate::Widget).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct WidgetId(taffy::NodeId);
+pub struct WidgetId<W> {
+    raw: RawWidgetId,
+    phantom: PhantomData<W>,
+}
 
-impl WidgetId {
-    pub fn set(self, id: &mut WidgetId) {
+impl<W> WidgetId<W> {
+    #[inline(always)]
+    pub(crate) fn new(raw: RawWidgetId) -> Self {
+        Self {
+            raw,
+            phantom: PhantomData,
+        }
+    }
+    pub fn raw(&self) -> RawWidgetId { self.raw }
+}
+
+/// Id of a [`Widget`](crate::Widget).
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RawWidgetId(taffy::NodeId);
+
+impl<W> From<WidgetId<W>> for RawWidgetId {
+    fn from(id: WidgetId<W>) -> Self {
+        id.raw
+    }
+}
+
+impl RawWidgetId {
+    pub fn set(self, id: &mut RawWidgetId) {
         *id = self;
     }
 }
 
-impl Default for WidgetId {
+impl Default for RawWidgetId {
     fn default() -> Self {
         Self(taffy::NodeId::new(u64::MAX))
     }
@@ -27,10 +52,10 @@ impl Default for WidgetId {
 /// A scene graph of [`Widget`]s.
 /// Every inserted [`Widget`] is wrapped in a [`Node`] which parent/child metadata.
 pub struct UI {
-    root_id: WidgetId,
+    root_id: RawWidgetId,
     widgets: TaffyTree<Box<dyn Widget>>,
-    state_bindings: HashMap<RawId, Vec<WidgetId>>,
-    to_render: Vec<WidgetId>,
+    state_bindings: HashMap<RawId, Vec<RawWidgetId>>,
+    to_render: Vec<RawWidgetId>,
     cursor: Cursor,
 }
 
@@ -42,7 +67,7 @@ impl UI {
         let mut widgets = TaffyTree::new();
         let state_id = root_widget.state_id();
         let root_id = widgets.new_leaf_with_context(root_widget_style, root_widget).unwrap();
-        let root_id = WidgetId(root_id);
+        let root_id = RawWidgetId(root_id);
         let mut result = Self {
             root_id,
             widgets,
@@ -56,26 +81,26 @@ impl UI {
         result
     }
 
-    pub fn root_id(&self) -> WidgetId { self.root_id }
+    pub fn root_id(&self) -> RawWidgetId { self.root_id }
 
-    pub fn get(&self, id: WidgetId) -> Option<&dyn Widget> {
+    pub fn get(&self, id: RawWidgetId) -> Option<&dyn Widget> {
         self.widgets
             .get_node_context(id.0)
             .map(|widget| widget.as_ref())
     }
 
-    pub fn get_mut(&mut self, id: WidgetId) -> Option<&mut dyn Widget> {
+    pub fn get_mut(&mut self, id: RawWidgetId) -> Option<&mut dyn Widget> {
         self.widgets
             .get_node_context_mut(id.0)
             .map(|widget| widget.as_mut())
     }
 
-    pub fn insert(&mut self, widget: impl Widget, parent_id: WidgetId) -> Option<WidgetId> {
+    pub fn insert(&mut self, widget: impl Widget, parent_id: RawWidgetId) -> Option<RawWidgetId> {
         let state_id = widget.state_id();
         let disable_view = widget.disable_view();
         let widget_style = style_of(&widget);
         let widget_id = self.widgets.new_leaf_with_context(widget_style, Box::new(widget)).unwrap();
-        let widget_id = WidgetId(widget_id);
+        let widget_id = RawWidgetId(widget_id);
         if let Err(_) = self.widgets.add_child(parent_id.0, widget_id.0) {
             self.widgets.remove(widget_id.0).unwrap();
             return None;
@@ -89,12 +114,12 @@ impl UI {
         Some(widget_id)
     }
 
-    pub fn bind_state(&mut self, widget_id: WidgetId, state_id: RawId) {
+    pub fn bind_state(&mut self, widget_id: RawWidgetId, state_id: RawId) {
         let state_binding = self.state_bindings.entry(state_id).or_default();
         state_binding.push(widget_id);
     }
 
-    pub fn unbind_state(&mut self, widget_id: WidgetId, state_id: RawId) {
+    pub fn unbind_state(&mut self, widget_id: RawWidgetId, state_id: RawId) {
         let Some(state_binding) = self.state_bindings.get_mut(&state_id) else { return };
         state_binding.retain(|wid| *wid != widget_id);
         if state_binding.is_empty() {
@@ -104,10 +129,10 @@ impl UI {
 
     /// Recursively removes the specified node, and all of its descendants.
     /// Returns true if node was in fact removed.
-    pub fn remove(&mut self, id: WidgetId) -> bool {
+    pub fn remove(&mut self, id: RawWidgetId) -> bool {
         let children_ids = self.widgets.children(id.0).unwrap();
         for child_id in children_ids {
-            self.remove(WidgetId(child_id));
+            self.remove(RawWidgetId(child_id));
         }
         match self.widgets.remove(id.0) {
             Ok(_) => true,
@@ -117,10 +142,10 @@ impl UI {
 
     /// Recursively removes the children of a [`Widget`], but not the [`Widget`] itself.
     /// This is generally used when "rerendering" a [`Widget`].
-    pub fn remove_children(&mut self, id: WidgetId) {
+    pub fn remove_children(&mut self, id: RawWidgetId) {
         let children_ids = self.widgets.children(id.0).unwrap();
         for child_id in children_ids {
-            self.remove(WidgetId(child_id));
+            self.remove(RawWidgetId(child_id));
         }
     }
 
@@ -163,7 +188,7 @@ impl UI {
 
     fn bubble_at(
         &self,
-        widget_id: WidgetId,
+        widget_id: RawWidgetId,
         x: f32,
         y: f32,
         callback: &mut impl FnMut(&dyn Widget, f32, f32, f32, f32) -> bool,
@@ -172,7 +197,7 @@ impl UI {
         let x = x - widget_layout.location.x;
         let y = y - widget_layout.location.y;
         for child_id in self.widgets.children(widget_id.0).unwrap() {
-            let child_id = WidgetId(child_id);
+            let child_id = RawWidgetId(child_id);
             let propagate_event = self.bubble_at(child_id, x, y, callback);
             if !propagate_event { return false }
         }
@@ -194,12 +219,12 @@ impl UI {
         }
     }
 
-    pub fn contains(&self, id: WidgetId) -> bool {
+    pub fn contains(&self, id: RawWidgetId) -> bool {
         self.widgets.get_node_context(id.0).is_some()
     }
 
     /// Clears the descendants of a [`Widget`] (if any), then renders them.
-    pub(crate) fn render_at(&mut self, id: WidgetId, font_db: &FontDB, store: &Store) {
+    pub(crate) fn render_at(&mut self, id: RawWidgetId, font_db: &FontDB, store: &Store) {
         if !self.contains(id) { return }
         self.remove_children(id);
         let Some(widget) = self.widgets.get_node_context(id.0) else { return };
@@ -215,7 +240,7 @@ impl UI {
         self.paint(self.root_id, scene, Affine::IDENTITY);
     }
 
-    pub(crate) fn paint(&self, id: WidgetId, scene: &mut Scene, mut affine: Affine) {
+    pub(crate) fn paint(&self, id: RawWidgetId, scene: &mut Scene, mut affine: Affine) {
         // Paints widget
         let widget = self.widgets.get_node_context(id.0).unwrap();
         let widget_layout = self.widgets.layout(id.0).unwrap();
@@ -228,7 +253,7 @@ impl UI {
 
         affine = affine.then_translate(transl);
         for child_id in widget_children {
-            self.paint(WidgetId(child_id), scene, affine);
+            self.paint(RawWidgetId(child_id), scene, affine);
         }
     }
 
@@ -237,7 +262,7 @@ impl UI {
     }
 
     /// Computes the layout of the [`Widget`] specified recursively.
-    pub(crate) fn compute_layout_at(&mut self, id: WidgetId, width: f32, height: f32) {
+    pub(crate) fn compute_layout_at(&mut self, id: RawWidgetId, width: f32, height: f32) {
         let space = Size {
             width: AvailableSpace::Definite(width),
             height: AvailableSpace::Definite(height),
@@ -252,7 +277,7 @@ impl UI {
 
 pub fn remove_children(
     widgets: &mut TaffyTree<Box<dyn Widget>>,
-    id: WidgetId
+    id: RawWidgetId
 ) {
     let Ok(children_ids) = widgets.children(id.0) else { return };
     for child_id in children_ids {
