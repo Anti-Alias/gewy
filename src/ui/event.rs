@@ -38,7 +38,10 @@ impl DynMessage {
     pub fn new(message: impl Message) -> Self {
         Self(Box::new(message))
     }
-    pub fn downcast_ref<M: Message>(&self) -> Option<&M> {
-        self.0.downcast_ref()
+    pub fn downcast<M: Message>(self) -> Option<M> {
+        match self.0.downcast() {
+            Ok(box_message) => Some(*box_message),
+            Err(_) => None,
+        }
     }
 }

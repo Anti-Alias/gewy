@@ -1,5 +1,15 @@
-use taffy::{Dimension, LengthPercentage, LengthPercentageAuto, Rect, Size};
+use taffy::{Dimension, JustifyContent, LengthPercentage, LengthPercentageAuto, Rect, Size, Style};
 
+/// A suitable style for a root component.
+/// Expands to the full size of its parent and centers its content.
+pub fn root_style() -> Style {
+    let mut style = Style::DEFAULT;
+    style.size.width = Dimension::Percent(1.0);
+    style.size.height = Dimension::Percent(1.0);
+    style.justify_content = Some(JustifyContent::Center);
+    style.align_items = Some(taffy::AlignItems::Center);
+    style
+}
 
 /// A style helper function for pixel values.
 /// Converts either into a [`Dimension`], a [`LengthPercentage`] or a [`LengthPercentageAuto`].

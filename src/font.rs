@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 use vello::peniko::{Blob, Font};
-use crate::GewyString;
+use crate::UiString;
 
 /// A query for a particular [`Font`](crate::paint::Font).
 /// Analagous to the various font-* properties in css.
 #[derive(Clone, PartialEq, Debug)]
 pub struct FontQuery {
-    pub family: GewyString,
+    pub family: UiString,
     pub weight: u32,
     pub style: FontStyle,
     pub size: u32,
@@ -113,7 +113,7 @@ impl FontDB {
 /// Metadata about a font in a [`FontDB`].
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct FontMeta {
-    pub family: GewyString,
+    pub family: UiString,
     pub weight: u32,
     pub style: FontStyle,
 }

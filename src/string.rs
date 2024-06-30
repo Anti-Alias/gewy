@@ -4,31 +4,21 @@ use std::ops::Deref;
 use std::str::Chars;
 
 /// Either a [`String`] or a static [`str`].
-/// Hash code is cached and used for faster equivalence checks, though this makes the comparison a little less reliable.
+/// Hash code is cached and used for faster equivalence checks, though this makes the comparison less reliable.
 #[derive(Clone, Eq, Debug)]
-pub struct GewyString {
+pub struct UiString {
     data: StringData,
     hash: u64
 }
 
-impl Deref for GewyString {
+impl Deref for UiString {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         &self.data
     }
 }
 
-pub trait ToGewyString {
-    fn go_gewy_string(self) -> GewyString;
-}
-
-impl<S: Into<GewyString>> ToGewyString for S {
-    fn go_gewy_string(self) -> GewyString {
-        self.into()
-    }
-}
-
-impl From<&'static str> for GewyString {
+impl From<&'static str> for UiString {
     fn from(value: &'static str) -> Self {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -39,7 +29,7 @@ impl From<&'static str> for GewyString {
     }
 }
 
-impl From<String> for GewyString {
+impl From<String> for UiString {
     fn from(value: String) -> Self {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -50,42 +40,53 @@ impl From<String> for GewyString {
     }
 }
 
-impl GewyString {
+impl UiString {
     pub fn chars(&self) -> Chars { self.data.chars() }
     pub fn hash(&self) -> u64 { self.hash }
 }
 
-impl PartialEq for GewyString {
+impl PartialEq for UiString {
     fn eq(&self, other: &Self) -> bool {
         self.hash == other.hash
     }
 }
 
-impl Ord for GewyString {
+impl Ord for UiString {
     fn cmp(&self, other: &Self) -> Ordering {
         self.data.cmp(&other.data)
     }
 }
 
-impl PartialOrd for GewyString {
+impl PartialOrd for UiString {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.data.partial_cmp(&other.data)
     }
 }
 
-impl Hash for GewyString {
+impl Hash for UiString {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.hash);
     }
 }
 
-impl Default for GewyString {
+impl Default for UiString {
     fn default() -> Self {
-        GewyString::from("")
+        UiString::from("")
     }
 }
 
-/// Raw data for a [`GewyString`].
+/// Any type that can be converted to a [`UiString`].
+pub trait ToUiString {
+    fn to_ui_string(self) -> UiString;
+}
+
+impl<S: Into<UiString>> ToUiString for S {
+    fn to_ui_string(self) -> UiString {
+        self.into()
+    }
+}
+
+/// Raw string data for a [`UiString`].
 #[derive(Clone, Eq, PartialEq, Debug)]
 enum StringData {
     Static(&'static str),

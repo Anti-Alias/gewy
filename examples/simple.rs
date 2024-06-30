@@ -7,25 +7,28 @@ fn main() {
     env_logger::init();
     let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
     App::new(fonts).start(|ctx| {
-        let widget = Wid::new(simple_fn, simple_cls);
+        let widget = Wid::root(simple_fn);
         ctx.add_window(Window::new(512, 512, widget));
     });
 }
 
 // View function
 fn simple_fn(v: &mut View) {
-    div(red_cls, v);
-    div_begin(gray_cls, v);
-        div(green_cls, v);
-        text("This is some text!", text_cls, v);
-        div(yellow_cls, v);
+    div_begin(root_cls, v);
+        div(red_cls, v);
+        div_begin(gray_cls, v);
+            div(green_cls, v);
+            text("This is some text!", text_cls, v);
+            div(yellow_cls, v);
+        end(v);
+        div(blue_cls, v);
     end(v);
-    div(blue_cls, v);
 }
 
 
 // ---------- Class functions ----------
-fn simple_cls(s: &mut Style) {
+fn root_cls(div: &mut Div) {
+    let s = &mut div.style;
     s.size.width = pc(1.0);
     s.size.height = pc(1.0);
     s.flex_direction = FlexDirection::Column;

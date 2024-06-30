@@ -1,4 +1,4 @@
-use crate::{Class, DynMessage, InputEvent, EventCtx, GewyString, Message, MouseButton, View, Widget};
+use crate::{Class, DynMessage, InputEvent, EventCtx, Message, MouseButton, View, Widget};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -27,7 +27,7 @@ pub enum ButtonEvent { Pressed, Released }
 
 impl Widget for Button {
 
-    fn name(&self) -> GewyString { "button".into() }
+    fn name(&self) -> &str { "button" }
 
     fn style(&self, style: &mut Style) {
         *style = self.style.clone();

@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{DynMessage, EventCtx, FontDB, GewyString, InputEvent, RawId, RawWidgetId, Store, WidgetId, UI};
+use crate::{DynMessage, EventCtx, FontDB, InputEvent, RawId, RawWidgetId, Store, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -12,7 +12,7 @@ use crate::kurbo::Affine;
 pub trait Widget: Downcast {
 
     /// Display name of the widget.
-    fn name(&self) -> GewyString { "widget".into() }
+    fn name(&self) -> &str { "widget" }
 
     /// [`Style`] used for computing layouts.
     #[allow(unused)]

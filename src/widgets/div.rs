@@ -1,6 +1,6 @@
 use taffy::FlexDirection;
 
-use crate::{Class, GewyString, View, Widget, WidgetId};
+use crate::{Class, View, Widget, WidgetId};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -15,7 +15,7 @@ pub struct Div {
 
 impl Widget for Div {
 
-    fn name(&self) -> GewyString { "div".into() }
+    fn name(&self) -> &str { "div" }
 
     fn style(&self, style: &mut Style) {
         *style = self.style.clone();

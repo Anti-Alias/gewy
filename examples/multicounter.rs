@@ -37,8 +37,7 @@ mod multicounter {
     #[derive(Clone)]
     enum Msg { Add, Remove }
 
-    fn update(state_id: Id<State>, store: &mut Store, message: DynMessage) {
-        let message = message.downcast_ref::<Msg>().unwrap();
+    fn update(state_id: Id<State>, store: &mut Store, message: Msg) {
         match message {
             Msg::Add => {
                 let counter_handle = store.init();
@@ -68,8 +67,8 @@ mod multicounter {
     }
 
     pub fn init(store: &mut Store) -> impl Widget {
-        let state = store.init::<State>();
-        create_comp(state.clone(), update, view)
+        let state_id = store.init::<State>();
+        Comp::root(state_id, update, view).with_name("multicounter")
     }
 
     fn root_cls(d: &mut Div) {
@@ -91,8 +90,7 @@ mod counter {
     #[derive(Clone)]
     enum Msg { Increment, Decrement }
 
-    fn update(state_id: Id<State>, store: &mut Store, message: DynMessage) {
-        let message: &Msg = message.downcast_ref().unwrap();
+    fn update(state_id: Id<State>, store: &mut Store, message: Msg) {
         let state = store.get_mut(&state_id);
         match message {
             Msg::Increment => state.0 += 1,
@@ -112,7 +110,7 @@ mod counter {
     }
 
     pub fn create(state: Handle<State>) -> impl Widget {
-        create_comp(state.clone(), update, view)
+        Comp::new(state, update, view).with_name("counter")
     }
 
     pub fn counter(state: Handle<State>, v: &mut View) {
@@ -121,9 +119,10 @@ mod counter {
     }
 }
 
+// ---------------- Common widget functions ----------------
 
 fn text_button(
-    txt: impl ToGewyString,
+    txt: impl ToUiString,
     message: impl Message,
     v: &mut View
 ) {
@@ -134,7 +133,7 @@ fn text_button(
 }
 
 fn small_text_button(
-    txt: impl ToGewyString,
+    txt: impl ToUiString,
     message: impl Message,
     v: &mut View
 ) {

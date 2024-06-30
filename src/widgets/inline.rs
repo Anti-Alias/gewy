@@ -1,21 +1,55 @@
-use crate::{Class, DynMessage, GewyString, Handle, Id, RawId, State, Store, View, Widget};
-use crate::taffy::Style;
+use std::marker::PhantomData;
+
+use taffy::Style;
+use crate::{root_style, DynMessage, Handle, Id, Message, RawId, State, Store, ToUiString, UiString, View, Widget};
+
 
 /// An inline [`Widget`] not bound to any state.
 /// Descendants are generated immediately after insertion.
 /// Useful as a "root widget" in an application.
-pub struct Wid<V> {
+pub struct Wid<V: ViewFn> {
+    pub name: UiString,
     pub style: Style,
-    pub view_fn: V,
+    pub view: V,
 }
 
-impl<V> Widget for Wid<V>
-where
-    V: ViewFn,
-{
-    fn name(&self) -> GewyString {
-        "inline".into()
+impl<V: ViewFn> Wid<V> {
+
+    pub fn new(view: V) -> Self {
+        Self {
+            name: "wid".into(),
+            style: Style::DEFAULT,
+            view
+        }
     }
+
+    pub fn root(view: V) -> Self {
+        Self {
+            name: "root".into(),
+            style: root_style(),
+            view
+        }
+    }
+
+    pub fn with_name(mut self, name: impl ToUiString) -> Self {
+        self.name = name.to_ui_string();
+        self
+    }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_root_style(mut self) -> Self {
+        self.style = root_style();
+        self
+    }
+}
+
+impl<V: ViewFn> Widget for Wid<V> {
+
+    fn name(&self) -> &str { &self.name }
 
     fn style(&self, style: &mut Style) {
         *style = self.style.clone();
@@ -23,20 +57,8 @@ where
 
     #[allow(unused)]
     fn view(&self, _store: &Store, v: &mut View) {
-        let view_fn = &self.view_fn;
+        let view_fn = &self.view;
         view_fn.view(v);
-    }
-}
-
-impl<V> Wid<V>
-where
-    V: ViewFn,
-{
-    pub fn new(view_fn: V, class: impl Class<Style>) -> Self {
-        Self {
-            style: class.produce(),
-            view_fn,
-        }
     }
 }
 
@@ -45,72 +67,107 @@ where
 /// Descendants are generated immediately after insertion.
 /// Descendants are regenerated whenever the state changes.
 /// Useful as a "root widget" in an application.
-struct Comp<S, U, V>
+pub struct Comp<S, M, U, V>
 where
     S: State,
-    U: UpdateFn<S>,
+    M: Message,
+    U: UpdateFn<S, M>,
     V: StateViewFn<S>,
 {
-    pub state_handle: Handle<S>,
-    pub update: U,
-    pub view: V,
+    name: UiString,
+    style: Style,
+    state_id: Handle<S>,
+    update_fn: U,
+    view_fn: V,
+    phantom: PhantomData<M>,
 }
 
-impl<S, R, V> Widget for Comp<S, R, V>
+impl<S, M, U, V> Comp<S, M, U, V>
 where
     S: State,
-    R: UpdateFn<S>,
+    M: Message,
+    U: UpdateFn<S, M>,
+    V: StateViewFn<S>,
+{
+    /// Creates a stateful [`Widget`] implementation using a [`State`], an update function and a view function.
+    pub fn new(
+        state_id: Handle<S>,
+        update_fn: U,
+        view_fn: V
+    ) -> Self {
+        Self {
+            name: "comp".into(),
+            style: Style::DEFAULT,
+            state_id,
+            update_fn,
+            view_fn,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn root(
+        state_id: Handle<S>,
+        update_fn: U,
+        view_fn: V
+    ) -> Self {
+        Self {
+            name: "root".into(),
+            style: root_style(),
+            state_id,
+            update_fn,
+            view_fn,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn with_name(mut self, name: impl ToUiString) -> Self {
+        self.name = name.to_ui_string();
+        self
+    }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_root_style(mut self) -> Self {
+        self.style = root_style();
+        self
+    }
+}
+
+
+impl<S, M, U, V> Widget for Comp<S, M, U, V>
+where
+    S: State,
+    M: Message,
+    U: UpdateFn<S, M>,
     V: StateViewFn<S>,
 {
 
-    fn name(&self) -> GewyString {
-        "comp".into()
+    fn name(&self) -> &str { &self.name }
+
+    fn style(&self, style: &mut Style) {
+        *style = self.style.clone();
     }
 
     fn state_id(&self) -> Option<RawId> {
-        Some(self.state_handle.id().raw())
+        Some(self.state_id.id().raw())
     }
 
     fn update(&self, state_id: RawId, store: &mut Store, message: DynMessage) {
-        let update = &self.update;
-        update.update(Id::from(state_id), store, message);
+        if let Some(message) = message.downcast() {
+            let update = &self.update_fn;
+            update.update(Id::from(state_id), store, message);
+        }
     }
 
     #[allow(unused)]
     fn view(&self, store: &Store, v: &mut View) {
-        let view = &self.view;
-        let state = store.get(&self.state_handle);
+        let view = &self.view_fn;
+        let state = store.get(&self.state_id);
         view.view(state, store, v);
     }
-}
-
-impl<S, U, V> Comp<S, U, V>
-where
-    S: State,
-    U: UpdateFn<S>,
-    V: StateViewFn<S>,
-{
-    fn new(state: Handle<S>, update: U, view: V) -> Self {
-        Self {
-            state_handle: state,
-            update,
-            view,
-        }
-    }
-}
-
-/// Creates a component widget using a state, an update function and a view function.
-pub fn create_comp<S, U, V>(
-    state: Handle<S>,
-    update: U,
-    view: V
-) -> impl Widget
-where
-    S: State,
-    U: UpdateFn<S>,
-    V: StateViewFn<S>,
-{
-    Comp::new(state, update, view)
 }
 
 /// A callback that builds the descendants of a [`Widget`].
@@ -127,7 +184,7 @@ where
     }
 }
 
-/// A callback that builds the descendants of a [`Widget`] with respect to some state.
+/// A function that builds the descendants of a [`Widget`] with respect to some state.
 pub trait StateViewFn<S: State>: 'static {
     fn view(&self, state: &S, store: &Store, view: &mut View);
 }
@@ -142,17 +199,22 @@ where
 }
 
 
-/// A callback that manipulates a state given a message.
-pub trait UpdateFn<S: 'static>: 'static {
-    fn update(&self, state_id: Id<S>, store: &mut Store, message: DynMessage);
-}
-
-impl<S, F> UpdateFn<S> for F
+/// A function that manipulates a state "S" given a message "M".
+pub trait UpdateFn<S, M>: 'static
 where
     S: State,
-    F: Fn(Id<S>, &mut Store, DynMessage) + 'static,
+    M: Message,
 {
-    fn update(&self, id: Id<S>, store: &mut Store, message: DynMessage) {
+    fn update(&self, state_id: Id<S>, store: &mut Store, message: M);
+}
+
+impl<S, M, F> UpdateFn<S, M> for F
+where
+    S: State,
+    M: Message,
+    F: Fn(Id<S>, &mut Store, M) + 'static,
+{
+    fn update(&self, id: Id<S>, store: &mut Store, message: M) {
         self(id, store, message)
     }
 }

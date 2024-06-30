@@ -9,12 +9,12 @@ use crate::vello::glyph::Glyph;
 use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontQuery, GewyString, ToGewyString, View, Widget, WidgetId};
+use crate::{Class, FontQuery, UiString, ToUiString, View, Widget, WidgetId};
 use crate::vello::Scene;
 
 /// A simple text [`Widget`](crate::Widget).
 pub struct Text {
-    pub string: GewyString,
+    pub string: UiString,
     pub font: FontQuery,
     pub line_height: f32,
     pub color: Color,
@@ -29,7 +29,7 @@ pub struct Text {
 impl Default for Text {
     fn default() -> Self {
         Self {
-            string: "".go_gewy_string(),
+            string: "".to_ui_string(),
             font: FontQuery::default(),
             line_height: 1.2,
             color: Color::WHITE,
@@ -45,7 +45,7 @@ impl Default for Text {
 
 impl Widget for Text {
 
-    fn name(&self) -> GewyString { "text".into() }
+    fn name(&self) -> &str { "text" }
 
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
         match (known_size.width, available_space.width) {
@@ -129,10 +129,10 @@ pub enum TextAlign {
     Center,
 }
 
-pub fn text(string: impl ToGewyString, class: impl Class<Text>, v: &mut View) -> WidgetId<Text> {
+pub fn text(string: impl ToUiString, class: impl Class<Text>, v: &mut View) -> WidgetId<Text> {
     // Configures text
     let mut text = Text {
-        string: string.go_gewy_string(),
+        string: string.to_ui_string(),
         ..Default::default()
     };
     class.apply(&mut text);
