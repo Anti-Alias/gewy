@@ -47,8 +47,6 @@ impl Widget for Text {
 
     fn name(&self) -> GewyString { "text".into() }
 
-    fn disable_view(&self) -> bool { true }
-
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
         match (known_size.width, available_space.width) {
             (None, AvailableSpace::Definite(def_width)) => {

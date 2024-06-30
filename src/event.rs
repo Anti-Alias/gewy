@@ -1,6 +1,7 @@
 use winit::event::{ElementState, MouseButton as WinitMouseButton};
 
 /// All events with regards to input.
+#[derive(Clone)]
 pub enum InputEvent {
     MousePressed { button: MouseButton },
     MouseReleased { button: MouseButton },

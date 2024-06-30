@@ -8,7 +8,6 @@ mod late;
 mod classes;
 mod event;
 mod state;
-pub mod listener;
 
 pub use app::*;
 pub use window::*;
@@ -20,7 +19,6 @@ pub use late::*;
 pub use classes::*;
 pub use event::*;
 pub use state::*;
-pub use listener::Listener;
 
 // Re-exports
 pub use taffy;

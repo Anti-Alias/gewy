@@ -1,8 +1,9 @@
-use std::any::Any;
+use std::ops::DerefMut;
 use std::sync::mpsc::{Receiver, Sender};
+use downcast_rs::{impl_downcast, Downcast};
 use slotmap::{new_key_type, SlotMap};
 
-use crate::{Handle, Id};
+use crate::{DynMessage, Handle, Id};
 
 
 /// Storage for state objects.
@@ -36,6 +37,11 @@ impl Store {
         state_data.state.downcast_mut().unwrap()
     }
 
+    pub(crate) fn get_mut_dyn(&mut self, id: RawId) -> &mut dyn State {
+        let state_obj = self.states.get_mut(id).unwrap();
+        state_obj.state.deref_mut()
+    }
+
     /// Creates a [`State`] with an initial value.
     pub fn create<S: State>(&mut self, state: S) -> Handle<S> {
         let raw_id = self.states.insert(StateObject {
@@ -43,7 +49,6 @@ impl Store {
             state: Box::new(state),
         });
         let id = Id::from(raw_id);
-        S::update(&id, self);
         Handle::new(id, self.sender.clone())
     }
 
@@ -51,13 +56,6 @@ impl Store {
     pub fn init<S: State + FromStore>(&mut self) -> Handle<S> {
         let state = S::from_store(self);
         self.create(state)
-    }
-
-    /// Allows for a [`State`] to update its content.
-    /// This tends to occur when a [`State`] has children [`State`]s
-    /// and needs to stay in sync with them.
-    pub fn update<S: State>(&mut self, id: &Id<S>) {
-        S::update(id, self);
     }
 
     /// Handles buffered events.
@@ -106,10 +104,9 @@ impl<'a> StoreView<'a> {
     }
 }
 
-pub trait State: Sized + Any {
-    #[allow(unused)]
-    fn update(id: &Id<Self>, store: &mut Store) {}
-}
+pub trait State: Downcast {}
+impl_downcast!(State);
+impl<T: Downcast> State for T {}
 
 
 /// Any state type that can be derived from a [`Store`].
@@ -134,7 +131,7 @@ pub enum StateEvent {
 /// A container for state within a [`Store`].
 struct StateObject {
     ref_count: u32,
-    state: Box<dyn Any>,
+    state: Box<dyn State>,
 }
 
 

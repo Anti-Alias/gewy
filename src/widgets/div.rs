@@ -17,8 +17,6 @@ impl Widget for Div {
 
     fn name(&self) -> GewyString { "div".into() }
 
-    fn disable_view(&self) -> bool { true }
-
     fn style(&self, style: &mut Style) {
         *style = self.style.clone();
     }

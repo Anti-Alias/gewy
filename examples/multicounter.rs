@@ -7,29 +7,17 @@ fn main() {
     env_logger::init();
     let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
     App::new(fonts).start(|ctx| {
-        let handle: Handle<MultiCounter> = ctx.store.init();
-        let widget = Comp::new(handle, multicounter_cls, multicounter_fn);
-        ctx.add_window(Window::new(512, 512, widget));
+        let multicounter_state: Handle<MultiCounter> = ctx.store.init();
+        let multicounter_widget = make_comp(multicounter_state, multicounter_reducer, multicounter_view);
+        ctx.add_window(Window::new(512, 512, multicounter_widget));
     });
 }
 
+/// -------------- MULTICOUNTER ---------------------
 pub struct MultiCounter {
     counter_sum: i32,
     counters: Vec<Handle<Counter>>,
 }
-
-impl State for MultiCounter {
-    fn update(id: &Id<Self>, store: &mut Store) {
-        let slf = store.get(id);
-        let counter_sum: i32 = slf.counters.iter()
-            .map(|counter_id| store.get(counter_id))
-            .map(|counter| counter.0)
-            .sum();
-        let slf = store.get_mut(id);
-        slf.counter_sum = counter_sum;
-    }
-}
-
 impl FromStore for MultiCounter {
     fn from_store(store: &mut Store) -> Self {
         Self {
@@ -39,113 +27,111 @@ impl FromStore for MultiCounter {
     }
 }
 
-#[derive(Default)]
-pub struct Counter(i32);
-impl State for Counter {}
+#[derive(Clone)]
+enum MultiMsg { AddCounter, RemoveCounter }
 
-
-// View function
-fn multicounter_fn(id: Id<MultiCounter>, store: &Store, v: &mut View) {
-    let add_listener = listener::for_event(ButtonEvent::Released, move |ctx| {
-        let counter_handle = ctx.store.init::<Counter>();
-        let state = ctx.store.get_mut(&id);
-        state.counters.push(counter_handle);
-    });
-    let rem_listener = listener::for_event(ButtonEvent::Released, move |ctx| {
-        let state = ctx.store.get_mut(&id);
-        state.counters.pop();        
-    });
-
-    let state = store.get(&id);
-    for counter_handle in &state.counters {
-        counter(counter_handle, listener::update(id), v);
-    }
-    div_begin(nop_cls, v);
-        text_button("Add Counter", add_listener, v);
-        text_button("Remove Counter", rem_listener, v);
-    end(v);
-    if state.counter_sum >= 10 {
-        text("Total is at least 10!", nop_cls, v);
+fn multicounter_reducer(id: Id<MultiCounter>, store: &mut Store, message: DynMessage) {
+    let message = message.downcast_ref::<MultiMsg>().unwrap();
+    match message {
+        MultiMsg::AddCounter => {
+            let new_counter: Handle<Counter> = store.init();
+            let multicounter = store.get_mut(&id);
+            multicounter.counters.push(new_counter);
+        }
+        MultiMsg::RemoveCounter => {
+            let multicounter = store.get_mut(&id);
+            multicounter.counters.pop();
+        }
     }
 }
+
+fn multicounter_view(multi: Id<MultiCounter>, store: &Store, v: &mut View) {
+    let multi = store.get(&multi);
+    div_begin(root_cls, v);
+        for counter_handle in &multi.counters {
+            counter(counter_handle, v);
+        }
+        div_begin(nop_cls, v);
+            text_button("Add Counter", MultiMsg::AddCounter, v);
+            text_button("Remove Counter", MultiMsg::RemoveCounter, v);
+        end(v);
+        if multi.counter_sum >= 10 {
+            text("Total is at least 10!", nop_cls, v);
+        }
+    end(v);
+}
+
+fn root_cls(d: &mut Div) {
+    d.style.flex_direction = FlexDirection::Column;
+    d.style.align_items = Some(AlignItems::Center);
+}
+
+
+/// -------------- COUNTER ---------------------
+#[derive(Default)]
+struct Counter(i32);
+
+#[derive(Clone)]
+enum CounterMsg { Increment, Decrement }
+
+fn counter_reducer(id: Id<Counter>, store: &mut Store, message: DynMessage) {
+    let message: &CounterMsg = message.downcast_ref().unwrap();
+    match message {
+        CounterMsg::Increment => store.get_mut(&id).0 += 1,
+        CounterMsg::Decrement => store.get_mut(&id).0 -= 1,
+    }
+}
+
 
 fn counter(
     handle: &Handle<Counter>,
-    listener: impl Listener<i32> + Clone,
     v: &mut View
 ) {
-    let view_fn = move |id: Id<Counter>, store: &Store, view: &mut View| {
-        let listener = listener.clone();
-        counter_fn(id, store, listener, view);
-    };
-    let counter_widget = Comp::new(handle.clone(), counter_cls, view_fn);
+    let counter_widget = make_comp(handle.clone(), counter_reducer, counter_view);
     v.insert(counter_widget);
 }
 
-fn counter_fn(
+fn counter_view(
     id: Id<Counter>,
     store: &Store,
-    listener: impl Listener<i32> + Clone,
     v: &mut View
 ) {
     let state = store.get(&id);
     let count_text = format!("Count: {}", state.0);
 
-    let listener_b = listener.clone();
-    let on_inc = listener::for_event(ButtonEvent::Released, move |ctx| {
-        let state = ctx.store.get_mut(&id);
-        state.0 += 1;
-        listener_b.handle(state.0, ctx);
-    });
-    let on_dec = listener::for_event(ButtonEvent::Released, move |ctx| {
-        let state = ctx.store.get_mut(&id);
-        state.0 -= 1;
-        listener.handle(state.0, ctx);
-    });
-
     col_begin(counter_box_cls, v);
         text(count_text, dark_text_cls, v);
         row_begin(small_box_cls, v);
-            small_text_button("+", on_inc, v);
-            small_text_button("-", on_dec, v);
+            small_text_button("+", CounterMsg::Increment, v);
+            small_text_button("-", CounterMsg::Decrement, v);
         end(v);
     end(v);
 }
 
 fn text_button(
     txt: impl ToGewyString,
-    listener: impl Listener<ButtonEvent>,
+    message: impl Message,
     v: &mut View
 ) {
-    button_begin(button_cls, listener, v);
+    let cls = move |button: &mut Button| button.on_release(message);
+    button_begin((text_button_cls, cls), v);
         text(txt, light_text_cls, v);
     end(v);
 }
 
 fn small_text_button(
     txt: impl ToGewyString,
-    listener: impl Listener<ButtonEvent>,
+    message: impl Message,
     v: &mut View
 ) {
-    button_begin(small_button_cls, listener, v);
+    let cls = move |button: &mut Button| button.on_release(message);
+    button_begin((small_button_cls, cls), v);
         text(txt, light_text_cls, v);
     end(v);
 }
 
 
 // --------------- Classes --------------- 
-
-fn multicounter_cls(s: &mut Style) {
-    s.size = size_all(pc(1.0));
-    s.flex_direction = FlexDirection::Column;
-    s.justify_content = Some(JustifyContent::Center);
-    s.align_items = Some(AlignItems::Center);
-}
-
-fn counter_cls(s: &mut Style) {
-    s.justify_content = Some(JustifyContent::Center);
-    s.align_items = Some(AlignItems::Center);
-}
 
 fn counter_box_cls(d: &mut Div) {
     let s = &mut d.style;
@@ -163,7 +149,7 @@ fn small_box_cls(d: &mut Div) {
     s.justify_content = Some(JustifyContent::SpaceBetween);
 }
 
-fn button_cls(b: &mut Button) {
+fn text_button_cls(b: &mut Button) {
     let s = &mut b.style;
     b.color = Color::rgb(0.1, 0.1, 0.1);
     b.radii = RoundedRectRadii::from(3.0);

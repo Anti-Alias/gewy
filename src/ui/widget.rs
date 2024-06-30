@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{FontDB, GewyString, MouseButton, RawId, RawWidgetId, Store, WidgetId, UI};
+use crate::{DynMessage, EventCtx, FontDB, GewyString, InputEvent, RawId, RawWidgetId, Store, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -18,24 +18,29 @@ pub trait Widget: Downcast {
     #[allow(unused)]
     fn style(&self, style: &mut Style) {}
 
-
     #[allow(unused)]
     fn measure(&mut self, known_size: Size<Option<f32>>, available_space: Size<AvailableSpace>) -> Size<f32> {
         Size::ZERO
     }
 
     #[allow(unused)]
-    fn event(&self, event: WidgetEvent, ctx: EventCtx) -> bool { true }
+    fn event(&self, event: InputEvent, ctx: EventCtx) -> bool { true }
 
+    /// True if cursor is touching this widget.
+    fn touches(&self, cursor_x: f32, cursor_y: f32, width: f32, height: f32) -> bool {
+        cursor_x >= 0.0 && cursor_y >= 0.0 && cursor_x <= width && cursor_y <= height
+    }
+
+    /// Raw ID 
     fn state_id(&self) -> Option<RawId> { None }
+
+    #[allow(unused)]
+    fn reduce_state(&self, state_id: RawId, store: &mut Store, message: DynMessage) {}
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.
     #[allow(unused)]
     fn paint(&self, scene: &mut Scene, layout: &Layout, affine: Affine) {}
-
-    /// If true, [`Widget::view`] will not be called after insertion.
-    fn disable_view(&self) -> bool { false }
 
     /// Renders descendant [`Widget`]s.
     #[allow(unused)]
@@ -44,28 +49,6 @@ pub trait Widget: Downcast {
 
 impl_downcast!(Widget);
 
-
-pub struct EventCtx<'a> {
-    pub store: &'a mut Store,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum WidgetEvent {
-    Pressed {
-        mouse_button: MouseButton,
-        mouse_x: f32,
-        mouse_y: f32,
-        width: f32,
-        height: f32,
-    },
-    Released {
-        mouse_button: MouseButton,
-        mouse_x: f32,
-        mouse_y: f32,
-        width: f32,
-        height: f32,
-    },
-}
 
 /// Utility used to build a tree of [`Widget`]s.
 pub struct View<'a> {

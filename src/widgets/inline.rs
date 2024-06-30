@@ -1,4 +1,4 @@
-use crate::{Class, GewyString, Handle, Id, RawId, State, Store, View, Widget, WidgetId};
+use crate::{Class, DynMessage, GewyString, Handle, Id, RawId, State, Store, View, Widget};
 use crate::taffy::Style;
 
 /// An inline [`Widget`] not bound to any state.
@@ -45,19 +45,21 @@ where
 /// Descendants are generated immediately after insertion.
 /// Descendants are regenerated whenever the state changes.
 /// Useful as a "root widget" in an application.
-pub struct Comp<S, V>
+struct Comp<S, R, V>
 where
     S: State,
+    R: ReducerFn<S>,
     V: StateViewFn<S>,
 {
-    pub style: Style,
-    pub state_handle: Handle<S>,
-    pub view_fn: V,
+    pub state: Handle<S>,
+    pub reducer: R,
+    pub view: V,
 }
 
-impl<S, V> Widget for Comp<S, V>
+impl<S, R, V> Widget for Comp<S, R, V>
 where
     S: State,
+    R: ReducerFn<S>,
     V: StateViewFn<S>,
 {
 
@@ -65,33 +67,48 @@ where
         "comp".into()
     }
 
-    fn style(&self, style: &mut Style) {
-        *style = self.style.clone();
+    fn state_id(&self) -> Option<RawId> {
+        Some(self.state.id().raw())
     }
 
-    fn state_id(&self) -> Option<RawId> {
-        Some(self.state_handle.id().raw())
+    fn reduce_state(&self, state_id: RawId, store: &mut Store, message: DynMessage) {
+        let reducer = &self.reducer;
+        reducer.reduce(Id::from(state_id), store, message);
     }
 
     #[allow(unused)]
     fn view(&self, store: &Store, v: &mut View) {
-        let view_fn = &self.view_fn;
-        view_fn.view(self.state_handle.id(), store, v);
+        let view_fn = &self.view;
+        view_fn.view(self.state.id(), store, v);
     }
 }
 
-impl<S, V> Comp<S, V>
+impl<S, R, V> Comp<S, R, V>
 where
     S: State,
+    R: ReducerFn<S>,
     V: StateViewFn<S>,
 {
-    pub fn new(state_handle: Handle<S>, class: impl Class<Style>, view_fn: V) -> Self {
+    fn new(state: Handle<S>, reducer: R, view: V) -> Self {
         Self {
-            style: class.produce(),
-            state_handle,
-            view_fn,
+            state,
+            reducer,
+            view,
         }
     }
+}
+
+pub fn make_comp<S, R, V>(
+    state: Handle<S>,
+    reducer: R,
+    view_fn: V
+) -> impl Widget
+where
+    S: State,
+    R: ReducerFn<S>,
+    V: StateViewFn<S>,
+{
+    Comp::new(state, reducer, view_fn)
 }
 
 /// A callback that builds the descendants of a [`Widget`].
@@ -122,38 +139,18 @@ where
     }
 }
 
-/// Creates a [`StateViewFn`] using a callback.
-#[inline(always)]
-pub fn state_view_fn<P, C, S>(
-    params: P,
-    callback: C,
-) -> impl StateViewFn<S>
-where
-    P: Clone + 'static,
-    C: Fn(Id<S>, &Store, P, &mut View) + 'static,
-    S: State,
-{
-    move |id: Id<S>, store: &Store, view: &mut View| {
-        let params = params.clone();
-        callback(id, store, params, view);
-    }
+
+/// A callback that manipulates a state given a message.
+pub trait ReducerFn<S: 'static>: 'static {
+    fn reduce(&self, state_id: Id<S>, store: &mut Store, message: DynMessage);
 }
 
-
-/// Insertion function for a [`Component`].
-pub fn comp<S, V>(
-    state_handle: Handle<S>,
-    class: impl Class<Style>,
-    view: &mut View,
-    view_fn: V,
-) -> WidgetId<Comp<S, V>>
+impl<S, F> ReducerFn<S> for F
 where
     S: State,
-    V: StateViewFn<S>,
+    F: Fn(Id<S>, &mut Store, DynMessage) + 'static,
 {
-    view.insert(Comp {
-        style: class.produce(),
-        state_handle,
-        view_fn,
-    })
+    fn reduce(&self, id: Id<S>, store: &mut Store, message: DynMessage) {
+        self(id, store, message)
+    }
 }

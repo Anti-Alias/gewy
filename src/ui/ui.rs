@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
-use crate::{EventCtx, FontDB, InputEvent, MouseButton, RawId, Store, View, Widget, WidgetEvent};
+use crate::{DynMessage, EventCtx, FontDB, InputEvent, MouseButton, RawId, Store, View, Widget};
 use crate::vello::Scene;
 use crate::taffy::Style;
 
@@ -97,7 +97,7 @@ impl UI {
 
     pub fn insert(&mut self, widget: impl Widget, parent_id: RawWidgetId) -> Option<RawWidgetId> {
         let state_id = widget.state_id();
-        let disable_view = widget.disable_view();
+        let disable_view = widget.state_id().is_none();
         let widget_style = style_of(&widget);
         let widget_id = self.widgets.new_leaf_with_context(widget_style, Box::new(widget)).unwrap();
         let widget_id = RawWidgetId(widget_id);
@@ -153,7 +153,6 @@ impl UI {
         self.widgets.total_node_count()
     }
 
-
     /// Rerenders [`Widget`]s bound the states provided.
     /// Returns true if layout / repainting are necessary.
     pub fn inform_state_changes(&mut self, state_ids: &[RawId]) -> usize {
@@ -166,24 +165,25 @@ impl UI {
 
     pub fn fire_input_event(&mut self, event: InputEvent, store: &mut Store) {
         match event {
-            InputEvent::MousePressed { button } => self.bubble(move |widget, x, y, width, height| {
-                let ctx = EventCtx { store };
-                let event = WidgetEvent::Pressed { mouse_button: button, mouse_x: x, mouse_y: y, width, height };
-                widget.event(event, ctx)
-            }),
-            InputEvent::MouseReleased { button } => self.bubble(|widget, x, y, width, height| {
-                let ctx = EventCtx { store };
-                let event = WidgetEvent::Released { mouse_button: button, mouse_x: x, mouse_y: y, width, height };
-                widget.event(event, ctx)
-            }),
-            InputEvent::CursorEntered               => self.cursor.on_screen = true,
-            InputEvent::CursorLeft                  => self.cursor.on_screen = false,
-            InputEvent::CursorMoved { x, y }        => { self.cursor.x = x; self.cursor.y = y },
+            InputEvent::CursorEntered           => self.cursor.on_screen = true,
+            InputEvent::CursorLeft              => self.cursor.on_screen = false,
+            InputEvent::CursorMoved { x, y }    => { self.cursor.x = x; self.cursor.y = y },
+            _ => {}
+        }
+
+        let mut widget_messages = vec![];
+        self.bubble(self.cursor.x, self.cursor.y, |widget_id, widget| {
+            let ctx = EventCtx { widget_id, store, messages: &mut widget_messages };
+            widget.event(event.clone(), ctx)
+        });
+
+        for widget_message in widget_messages {
+            self.propagate_message(store, widget_message.message, widget_message.widget_id);
         }
     }
 
-    fn bubble(&self, mut callback: impl FnMut(&dyn Widget, f32, f32, f32, f32) -> bool) {
-        self.bubble_at(self.root_id, self.cursor.x, self.cursor.y, &mut callback);
+    fn bubble(&self, x: f32, y: f32, mut callback: impl FnMut(RawWidgetId, &dyn Widget) -> bool) {
+        self.bubble_at(self.root_id, x, y, &mut callback);
     }
 
     fn bubble_at(
@@ -191,7 +191,7 @@ impl UI {
         widget_id: RawWidgetId,
         x: f32,
         y: f32,
-        callback: &mut impl FnMut(&dyn Widget, f32, f32, f32, f32) -> bool,
+        callback: &mut impl FnMut(RawWidgetId, &dyn Widget) -> bool,
     ) -> bool {
         let widget_layout = self.widgets.layout(widget_id.0).unwrap();
         let x = x - widget_layout.location.x;
@@ -203,11 +203,25 @@ impl UI {
         }
         let widget = self.widgets.get_node_context(widget_id.0).unwrap();
         let widget_size = widget_layout.size;
-        if x >= 0.0 && y >= 0.0 && x <= widget_size.width && y <= widget_size.height {
-            callback(widget.as_ref(), x, y, widget_size.width, widget_size.height)
+        if widget.touches(x, y, widget_size.width, widget_size.height) {
+            callback(widget_id, widget.as_ref())
         }
         else {
             true
+        }
+    }
+
+    fn propagate_message(&mut self, store: &mut Store, message: DynMessage, mut widget_id: RawWidgetId) {
+        loop {
+            let widget = self.widgets.get_node_context_mut(widget_id.0).unwrap();
+            if let Some(state_id) = widget.state_id() {
+                widget.reduce_state(state_id, store, message);
+                return;
+            }
+            else {
+                let Some(taffy_id) = self.widgets.parent(widget_id.0) else { return };
+                widget_id = RawWidgetId(taffy_id);
+            }
         }
     }
 
