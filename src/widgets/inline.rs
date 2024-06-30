@@ -45,21 +45,21 @@ where
 /// Descendants are generated immediately after insertion.
 /// Descendants are regenerated whenever the state changes.
 /// Useful as a "root widget" in an application.
-struct Comp<S, R, V>
+struct Comp<S, U, V>
 where
     S: State,
-    R: ReducerFn<S>,
+    U: UpdateFn<S>,
     V: StateViewFn<S>,
 {
-    pub state: Handle<S>,
-    pub reducer: R,
+    pub state_handle: Handle<S>,
+    pub update: U,
     pub view: V,
 }
 
 impl<S, R, V> Widget for Comp<S, R, V>
 where
     S: State,
-    R: ReducerFn<S>,
+    R: UpdateFn<S>,
     V: StateViewFn<S>,
 {
 
@@ -68,47 +68,49 @@ where
     }
 
     fn state_id(&self) -> Option<RawId> {
-        Some(self.state.id().raw())
+        Some(self.state_handle.id().raw())
     }
 
-    fn reduce_state(&self, state_id: RawId, store: &mut Store, message: DynMessage) {
-        let reducer = &self.reducer;
-        reducer.reduce(Id::from(state_id), store, message);
+    fn update(&self, state_id: RawId, store: &mut Store, message: DynMessage) {
+        let update = &self.update;
+        update.update(Id::from(state_id), store, message);
     }
 
     #[allow(unused)]
     fn view(&self, store: &Store, v: &mut View) {
-        let view_fn = &self.view;
-        view_fn.view(self.state.id(), store, v);
+        let view = &self.view;
+        let state = store.get(&self.state_handle);
+        view.view(state, store, v);
     }
 }
 
-impl<S, R, V> Comp<S, R, V>
+impl<S, U, V> Comp<S, U, V>
 where
     S: State,
-    R: ReducerFn<S>,
+    U: UpdateFn<S>,
     V: StateViewFn<S>,
 {
-    fn new(state: Handle<S>, reducer: R, view: V) -> Self {
+    fn new(state: Handle<S>, update: U, view: V) -> Self {
         Self {
-            state,
-            reducer,
+            state_handle: state,
+            update,
             view,
         }
     }
 }
 
-pub fn make_comp<S, R, V>(
+/// Creates a component widget using a state, an update function and a view function.
+pub fn create_comp<S, U, V>(
     state: Handle<S>,
-    reducer: R,
-    view_fn: V
+    update: U,
+    view: V
 ) -> impl Widget
 where
     S: State,
-    R: ReducerFn<S>,
+    U: UpdateFn<S>,
     V: StateViewFn<S>,
 {
-    Comp::new(state, reducer, view_fn)
+    Comp::new(state, update, view)
 }
 
 /// A callback that builds the descendants of a [`Widget`].
@@ -127,30 +129,30 @@ where
 
 /// A callback that builds the descendants of a [`Widget`] with respect to some state.
 pub trait StateViewFn<S: State>: 'static {
-    fn view(&self, state_id: Id<S>, store: &Store, view: &mut View);
+    fn view(&self, state: &S, store: &Store, view: &mut View);
 }
 
 impl<S: State, F> StateViewFn<S> for F
 where
-    F: Fn(Id<S>, &Store, &mut View) + 'static,
+    F: Fn(&S, &Store, &mut View) + 'static,
 {
-    fn view(&self, id: Id<S>, store: &Store, view: &mut View) {
-        self(id, store, view)
+    fn view(&self, state: &S, store: &Store, view: &mut View) {
+        self(state, store, view)
     }
 }
 
 
 /// A callback that manipulates a state given a message.
-pub trait ReducerFn<S: 'static>: 'static {
-    fn reduce(&self, state_id: Id<S>, store: &mut Store, message: DynMessage);
+pub trait UpdateFn<S: 'static>: 'static {
+    fn update(&self, state_id: Id<S>, store: &mut Store, message: DynMessage);
 }
 
-impl<S, F> ReducerFn<S> for F
+impl<S, F> UpdateFn<S> for F
 where
     S: State,
     F: Fn(Id<S>, &mut Store, DynMessage) + 'static,
 {
-    fn reduce(&self, id: Id<S>, store: &mut Store, message: DynMessage) {
+    fn update(&self, id: Id<S>, store: &mut Store, message: DynMessage) {
         self(id, store, message)
     }
 }

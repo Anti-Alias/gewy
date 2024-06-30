@@ -7,106 +7,120 @@ fn main() {
     env_logger::init();
     let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
     App::new(fonts).start(|ctx| {
-        let multicounter_state: Handle<MultiCounter> = ctx.store.init();
-        let multicounter_widget = make_comp(multicounter_state, multicounter_reducer, multicounter_view);
-        ctx.add_window(Window::new(512, 512, multicounter_widget));
+        let widget = multicounter::init(&mut ctx.store);
+        ctx.add_window(Window::new(512, 512, widget));
     });
 }
 
 /// -------------- MULTICOUNTER ---------------------
-pub struct MultiCounter {
-    counter_sum: i32,
-    counters: Vec<Handle<Counter>>,
-}
-impl FromStore for MultiCounter {
-    fn from_store(store: &mut Store) -> Self {
-        Self {
-            counter_sum: 0,
-            counters: vec![ store.init() ],
+mod multicounter {
+
+    use gewy::*;
+    use gewy::taffy::*;
+    use crate::counter;
+    use crate::counter::counter;
+    use crate::*;
+
+    pub struct State {
+        counter_sum: i32,
+        counter_handles: Vec<Handle<counter::State>>,
+    }
+    impl FromStore for State {
+        fn from_store(store: &mut Store) -> Self {
+            Self {
+                counter_sum: 0,
+                counter_handles: vec![ store.init() ],
+            }
         }
     }
-}
 
-#[derive(Clone)]
-enum MultiMsg { AddCounter, RemoveCounter }
+    #[derive(Clone)]
+    enum Msg { Add, Remove }
 
-fn multicounter_reducer(id: Id<MultiCounter>, store: &mut Store, message: DynMessage) {
-    let message = message.downcast_ref::<MultiMsg>().unwrap();
-    match message {
-        MultiMsg::AddCounter => {
-            let new_counter: Handle<Counter> = store.init();
-            let multicounter = store.get_mut(&id);
-            multicounter.counters.push(new_counter);
-        }
-        MultiMsg::RemoveCounter => {
-            let multicounter = store.get_mut(&id);
-            multicounter.counters.pop();
+    fn update(state_id: Id<State>, store: &mut Store, message: DynMessage) {
+        let message = message.downcast_ref::<Msg>().unwrap();
+        match message {
+            Msg::Add => {
+                let counter_handle = store.init();
+                let state = store.get_mut(&state_id);
+                state.counter_handles.push(counter_handle);
+            }
+            Msg::Remove => {
+                let multicounter = store.get_mut(&state_id);
+                multicounter.counter_handles.pop();
+            }
         }
     }
-}
 
-fn multicounter_view(multi: Id<MultiCounter>, store: &Store, v: &mut View) {
-    let multi = store.get(&multi);
-    div_begin(root_cls, v);
-        for counter_handle in &multi.counters {
-            counter(counter_handle, v);
-        }
-        div_begin(nop_cls, v);
-            text_button("Add Counter", MultiMsg::AddCounter, v);
-            text_button("Remove Counter", MultiMsg::RemoveCounter, v);
+    fn view(state: &State, _store: &Store, v: &mut View) {
+        div_begin(root_cls, v);
+            for counter_handle in &state.counter_handles {
+                counter(counter_handle.clone(), v);
+            }
+            div_begin(nop_cls, v);
+                text_button("Add Counter", Msg::Add, v);
+                text_button("Remove Counter", Msg::Remove, v);
+            end(v);
+            if state.counter_sum >= 10 {
+                text("Total is at least 10!", nop_cls, v);
+            }
         end(v);
-        if multi.counter_sum >= 10 {
-            text("Total is at least 10!", nop_cls, v);
-        }
-    end(v);
-}
+    }
 
-fn root_cls(d: &mut Div) {
-    d.style.flex_direction = FlexDirection::Column;
-    d.style.align_items = Some(AlignItems::Center);
-}
+    pub fn init(store: &mut Store) -> impl Widget {
+        let state = store.init::<State>();
+        create_comp(state.clone(), update, view)
+    }
 
-
-/// -------------- COUNTER ---------------------
-#[derive(Default)]
-struct Counter(i32);
-
-#[derive(Clone)]
-enum CounterMsg { Increment, Decrement }
-
-fn counter_reducer(id: Id<Counter>, store: &mut Store, message: DynMessage) {
-    let message: &CounterMsg = message.downcast_ref().unwrap();
-    match message {
-        CounterMsg::Increment => store.get_mut(&id).0 += 1,
-        CounterMsg::Decrement => store.get_mut(&id).0 -= 1,
+    fn root_cls(d: &mut Div) {
+        d.style.flex_direction = FlexDirection::Column;
+        d.style.align_items = Some(AlignItems::Center);
     }
 }
 
 
-fn counter(
-    handle: &Handle<Counter>,
-    v: &mut View
-) {
-    let counter_widget = make_comp(handle.clone(), counter_reducer, counter_view);
-    v.insert(counter_widget);
-}
+/// Defines the counter component.
+mod counter {
 
-fn counter_view(
-    id: Id<Counter>,
-    store: &Store,
-    v: &mut View
-) {
-    let state = store.get(&id);
-    let count_text = format!("Count: {}", state.0);
+    use gewy::*;
+    use crate::*;
+   
+    #[derive(Default)]
+    pub struct State(i32);
 
-    col_begin(counter_box_cls, v);
-        text(count_text, dark_text_cls, v);
-        row_begin(small_box_cls, v);
-            small_text_button("+", CounterMsg::Increment, v);
-            small_text_button("-", CounterMsg::Decrement, v);
+    #[derive(Clone)]
+    enum Msg { Increment, Decrement }
+
+    fn update(state_id: Id<State>, store: &mut Store, message: DynMessage) {
+        let message: &Msg = message.downcast_ref().unwrap();
+        let state = store.get_mut(&state_id);
+        match message {
+            Msg::Increment => state.0 += 1,
+            Msg::Decrement => state.0 -= 1,
+        }
+    }
+
+    fn view(state: &State, _store: &Store, v: &mut View) {
+        let count_text = format!("Count: {}", state.0);
+        col_begin(counter_box_cls, v);
+            text(count_text, dark_text_cls, v);
+            row_begin(small_box_cls, v);
+                small_text_button("+", Msg::Increment, v);
+                small_text_button("-", Msg::Decrement, v);
+            end(v);
         end(v);
-    end(v);
+    }
+
+    pub fn create(state: Handle<State>) -> impl Widget {
+        create_comp(state.clone(), update, view)
+    }
+
+    pub fn counter(state: Handle<State>, v: &mut View) {
+        let widget = create(state);
+        v.insert(widget);
+    }
 }
+
 
 fn text_button(
     txt: impl ToGewyString,

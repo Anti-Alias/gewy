@@ -3,8 +3,7 @@ use std::ops::Deref;
 use std::sync::mpsc::Sender;
 use crate::{RawId, State, StateEvent};
 
-/// Typed identifier for a state object.
-/// Keeps the underlying resource alive until dropped.
+/// A typed identifier for a reference-counted [`State`] object within a [`Store`](crate::Store).
 #[derive(Debug)]
 pub struct Handle<S: State> {
     id: Id<S>,
@@ -20,6 +19,7 @@ impl<S: State> Deref for Handle<S> {
 }
 
 impl<S: State> Handle<S> {
+
     pub(crate) fn new(id: Id<S>, events: Sender<StateEvent>) -> Self {
         Self { id, events }
     }

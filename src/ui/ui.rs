@@ -215,7 +215,7 @@ impl UI {
         loop {
             let widget = self.widgets.get_node_context_mut(widget_id.0).unwrap();
             if let Some(state_id) = widget.state_id() {
-                widget.reduce_state(state_id, store, message);
+                widget.update(state_id, store, message);
                 return;
             }
             else {

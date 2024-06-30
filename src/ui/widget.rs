@@ -35,7 +35,7 @@ pub trait Widget: Downcast {
     fn state_id(&self) -> Option<RawId> { None }
 
     #[allow(unused)]
-    fn reduce_state(&self, state_id: RawId, store: &mut Store, message: DynMessage) {}
+    fn update(&self, state_id: RawId, store: &mut Store, message: DynMessage) {}
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.

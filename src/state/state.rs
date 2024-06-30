@@ -1,12 +1,10 @@
-use std::ops::DerefMut;
 use std::sync::mpsc::{Receiver, Sender};
 use downcast_rs::{impl_downcast, Downcast};
 use slotmap::{new_key_type, SlotMap};
+use crate::{Handle, Id};
 
-use crate::{DynMessage, Handle, Id};
 
-
-/// Storage for state objects.
+/// Storage for reference-counted [`State`] objects.
 pub struct Store {
     states: SlotMap<RawId, StateObject>,
     sender: Sender<StateEvent>,
@@ -35,11 +33,6 @@ impl Store {
         self.updated_states.push(id.raw());
         let state_data = self.states.get_mut(id.raw()).unwrap();
         state_data.state.downcast_mut().unwrap()
-    }
-
-    pub(crate) fn get_mut_dyn(&mut self, id: RawId) -> &mut dyn State {
-        let state_obj = self.states.get_mut(id).unwrap();
-        state_obj.state.deref_mut()
     }
 
     /// Creates a [`State`] with an initial value.
@@ -80,36 +73,15 @@ impl Store {
     }
 }
 
-/// A view into a [`Store`].
-pub struct StoreView<'a> {
-    store: &'a mut Store,
-    updating_id: RawId,
-}
-
-impl<'a> StoreView<'a> {
-    pub fn get<S: State>(&self, id: &Id<S>) -> &S {
-        self.check_id(id.raw());
-        self.store.get(id)
-    }
-
-    pub fn get_mut<S: State>(&mut self, id: &Id<S>) -> &mut S {
-        self.check_id(id.raw());
-        self.store.get_mut(id)
-    }
-
-    fn check_id(&self, id: RawId) {
-        if id == self.updating_id {
-            panic!("State being updated");
-        }
-    }
-}
-
+/// A marker trait for the state of a component.
 pub trait State: Downcast {}
 impl_downcast!(State);
 impl<T: Downcast> State for T {}
 
 
-/// Any state type that can be derived from a [`Store`].
+/// Any [`State`] type that can be derived from a [`Store`].
+/// Useful for [`State`]s that have a default value with fields
+/// that are also [`State`].
 pub trait FromStore {
     fn from_store(store: &mut Store) -> Self;
 }
@@ -121,14 +93,13 @@ impl<D: Default> FromStore for D {
 }
 
 
-
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum StateEvent {
     Clone(RawId),
     Drop(RawId),
 }
 
-/// A container for state within a [`Store`].
+/// A reference-counted state object.
 struct StateObject {
     ref_count: u32,
     state: Box<dyn State>,
