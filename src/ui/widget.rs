@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{DynMessage, EventCtx, FontDB, InputEvent, RawId, RawWidgetId, Store, WidgetId, UI};
+use crate::{DynMessage, EventCtx, FontDB, InputEvent, RawWidgetId, Store, UntypedId, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -32,10 +32,10 @@ pub trait Widget: Downcast {
     }
 
     /// Raw ID 
-    fn state_id(&self) -> Option<RawId> { None }
+    fn state_id(&self) -> Option<&UntypedId> { None }
 
     #[allow(unused)]
-    fn update(&self, state_id: RawId, store: &mut Store, message: DynMessage) {}
+    fn update(&self, state_id: UntypedId, store: &mut Store, message: DynMessage) {}
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.

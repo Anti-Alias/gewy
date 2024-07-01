@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use taffy::Style;
-use crate::{root_style, DynMessage, Handle, Id, Message, RawId, State, Store, ToUiString, UiString, View, Widget};
+use crate::{root_style, DynMessage, Id, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
 
 
 /// An inline [`Widget`] not bound to any state.
@@ -76,9 +76,9 @@ where
 {
     name: UiString,
     style: Style,
-    state_id: Handle<S>,
-    update_fn: U,
-    view_fn: V,
+    state_id: Id<S>,
+    update: U,
+    view: V,
     phantom: PhantomData<M>,
 }
 
@@ -91,7 +91,7 @@ where
 {
     /// Creates a stateful [`Widget`] implementation using a [`State`], an update function and a view function.
     pub fn new(
-        state_id: Handle<S>,
+        state_id: Id<S>,
         update_fn: U,
         view_fn: V
     ) -> Self {
@@ -99,23 +99,23 @@ where
             name: "comp".into(),
             style: Style::DEFAULT,
             state_id,
-            update_fn,
-            view_fn,
+            update: update_fn,
+            view: view_fn,
             phantom: PhantomData,
         }
     }
 
     pub fn root(
-        state_id: Handle<S>,
-        update_fn: U,
-        view_fn: V
+        state: Id<S>,
+        update: U,
+        view: V
     ) -> Self {
         Self {
             name: "root".into(),
             style: root_style(),
-            state_id,
-            update_fn,
-            view_fn,
+            state_id: state,
+            update,
+            view,
             phantom: PhantomData,
         }
     }
@@ -151,22 +151,23 @@ where
         *style = self.style.clone();
     }
 
-    fn state_id(&self) -> Option<RawId> {
-        Some(self.state_id.id().raw())
+    fn state_id(&self) -> Option<&UntypedId> {
+        Some(&self.state_id.untyped())
     }
 
-    fn update(&self, state_id: RawId, store: &mut Store, message: DynMessage) {
-        if let Some(message) = message.downcast() {
-            let update = &self.update_fn;
-            update.update(Id::from(state_id), store, message);
+    fn update(&self, state_id: UntypedId, store: &mut Store, message: DynMessage) {
+        let state_id: Id<S> = Id::from(state_id);
+        if let Some(msg) = message.downcast_ref() {
+            let update = &self.update;
+            let params = UpdateParams { state_id, msg, store };
+            update.update(params);
         }
     }
 
     #[allow(unused)]
     fn view(&self, store: &Store, v: &mut View) {
-        let view = &self.view_fn;
-        let state = store.get(&self.state_id);
-        view.view(state, store, v);
+        let view = &self.view;
+        view.view(self.state_id.clone_weak(), store, v);
     }
 }
 
@@ -186,15 +187,16 @@ where
 
 /// A function that builds the descendants of a [`Widget`] with respect to some state.
 pub trait StateViewFn<S: State>: 'static {
-    fn view(&self, state: &S, store: &Store, view: &mut View);
+    fn view(&self, state_id: Id<S>, store: &Store, view: &mut View);
 }
 
 impl<S: State, F> StateViewFn<S> for F
 where
-    F: Fn(&S, &Store, &mut View) + 'static,
+    F: Fn(ViewParams<S>) + 'static,
 {
-    fn view(&self, state: &S, store: &Store, view: &mut View) {
-        self(state, store, view)
+    fn view(&self, state_id: Id<S>, store: &Store, view: &mut View) {
+        let params = ViewParams { state_id, store, view };
+        self(params)
     }
 }
 
@@ -205,16 +207,63 @@ where
     S: State,
     M: Message,
 {
-    fn update(&self, state_id: Id<S>, store: &mut Store, message: M);
+    fn update(&self, params: UpdateParams<S, M>);
 }
 
 impl<S, M, F> UpdateFn<S, M> for F
 where
     S: State,
     M: Message,
-    F: Fn(Id<S>, &mut Store, M) + 'static,
+    F: Fn(UpdateParams<S, M>) + 'static,
 {
-    fn update(&self, id: Id<S>, store: &mut Store, message: M) {
-        self(id, store, message)
+    fn update(&self, params: UpdateParams<S, M>) {
+        self(params)
+    }
+}
+
+
+/// Parameters sent to a [`StateViewFn`].
+pub struct ViewParams<'a, 'b, S: State> {
+    pub state_id: Id<S>,
+    pub store: &'a Store,
+    pub view: &'a mut View<'b>,
+}
+
+impl<'a, 'b, S: State> ViewParams<'a, 'b, S> {
+    pub fn state(&self) -> &S {
+        self.store.get(&self.state_id)
+    }
+    pub fn state_view(&mut self) -> (&S, &mut View<'b>) {
+        let state = self.store.get(&self.state_id);
+        (state, self.view)
+    }
+}
+
+
+
+/// Parameters sent to an [`UpdateFn`].
+pub struct UpdateParams<'a, S, M>
+where
+    S: State,
+    M: Message,
+{
+    pub state_id: Id<S>,
+    pub msg: &'a M,
+    pub store: &'a mut Store,
+}
+
+impl<'a, S, M> UpdateParams<'a, S, M>
+where
+    S: State,
+    M: Message,
+{
+    #[inline(always)]
+    pub fn state(&self) -> &S {
+        self.store.get(&self.state_id)
+    }
+
+    #[inline(always)]
+    pub fn state_mut(&mut self) -> &mut S {
+        self.store.get_mut(&self.state_id)
     }
 }

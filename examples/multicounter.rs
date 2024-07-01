@@ -7,7 +7,8 @@ fn main() {
     env_logger::init();
     let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
     App::new(fonts).start(|ctx| {
-        let widget = multicounter::init(&mut ctx.store);
+        let state   = multicounter::create_state(&mut ctx.store);
+        let widget  = multicounter::create_widget(state);
         ctx.add_window(Window::new(512, 512, widget));
     });
 }
@@ -16,45 +17,35 @@ fn main() {
 mod multicounter {
 
     use gewy::*;
-    use gewy::taffy::*;
     use crate::counter;
     use crate::counter::counter;
     use crate::*;
 
     pub struct State {
         counter_sum: i32,
-        counter_handles: Vec<Handle<counter::State>>,
-    }
-    impl FromStore for State {
-        fn from_store(store: &mut Store) -> Self {
-            Self {
-                counter_sum: 0,
-                counter_handles: vec![ store.init() ],
-            }
-        }
+        counters: Vec<Id<counter::State>>,
     }
 
     #[derive(Clone)]
     enum Msg { Add, Remove }
 
-    fn update(state_id: Id<State>, store: &mut Store, message: Msg) {
-        match message {
+    fn update(mut params: UpdateParams<State, Msg>) {
+        match params.msg {
             Msg::Add => {
-                let counter_handle = store.init();
-                let state = store.get_mut(&state_id);
-                state.counter_handles.push(counter_handle);
+                let counter = counter::create_state(params.store);
+                params.state_mut().counters.push(counter);
             }
             Msg::Remove => {
-                let multicounter = store.get_mut(&state_id);
-                multicounter.counter_handles.pop();
+                params.state_mut().counters.pop();
             }
         }
     }
 
-    fn view(state: &State, _store: &Store, v: &mut View) {
+    fn view(mut params: ViewParams<State>) {
+        let (state, v) = params.state_view();
         div_begin(root_cls, v);
-            for counter_handle in &state.counter_handles {
-                counter(counter_handle.clone(), v);
+            for counter_id in &state.counters {
+                counter(counter_id.clone(), v);
             }
             div_begin(nop_cls, v);
                 text_button("Add Counter", Msg::Add, v);
@@ -66,39 +57,45 @@ mod multicounter {
         end(v);
     }
 
-    pub fn init(store: &mut Store) -> impl Widget {
-        let state_id = store.init::<State>();
-        Comp::root(state_id, update, view).with_name("multicounter")
+    pub fn create_widget(state: Id<State>) -> impl Widget {
+        Comp::root(state, update, view).with_name("multicounter")
     }
 
-    fn root_cls(d: &mut Div) {
-        d.style.flex_direction = FlexDirection::Column;
-        d.style.align_items = Some(AlignItems::Center);
+    pub fn create_state(store: &mut Store) -> Id<State> {
+        let state = State {
+            counter_sum: 0,
+            counters: vec![
+                counter::create_state(store),
+            ],
+        };
+        store.create(state)
     }
 }
 
 
-/// Defines the counter component.
+/// Defines the counter component (SMUV = State, Message, Update, View).
 mod counter {
-
     use gewy::*;
     use crate::*;
-   
-    #[derive(Default)]
+
+    /// S: Counter state type
     pub struct State(i32);
 
+    /// M: Message type
     #[derive(Clone)]
-    enum Msg { Increment, Decrement }
+    pub enum Msg { Increment, Decrement }
 
-    fn update(state_id: Id<State>, store: &mut Store, message: Msg) {
-        let state = store.get_mut(&state_id);
-        match message {
-            Msg::Increment => state.0 += 1,
-            Msg::Decrement => state.0 -= 1,
+    /// U: Update function
+    fn update(mut params: UpdateParams<State, Msg>) {
+        match params.msg {
+            Msg::Increment => params.state_mut().0 += 1,
+            Msg::Decrement => params.state_mut().0 -= 1,
         }
     }
 
-    fn view(state: &State, _store: &Store, v: &mut View) {
+    /// V: View function
+    fn view(mut params: ViewParams<State>) {
+        let (state, v) = params.state_view();
         let count_text = format!("Count: {}", state.0);
         col_begin(counter_box_cls, v);
             text(count_text, dark_text_cls, v);
@@ -109,35 +106,32 @@ mod counter {
         end(v);
     }
 
-    pub fn create(state: Handle<State>) -> impl Widget {
-        Comp::new(state, update, view).with_name("counter")
+    // Insertion function
+    pub fn counter(state: Id<State>, v: &mut View) {
+        let widget = create_widget(state);
+        v.insert(widget);
     }
 
-    pub fn counter(state: Handle<State>, v: &mut View) {
-        let widget = create(state);
-        v.insert(widget);
+    pub fn create_widget(state_id: Id<State>) -> impl Widget {
+        Comp::new(state_id, update, view).with_name("counter")
+    }
+
+    pub fn create_state(store: &mut Store) -> Id<State> {
+        store.create(State(0))
     }
 }
 
-// ---------------- Common widget functions ----------------
+// ---------------- Stateless widget functions ----------------
 
-fn text_button(
-    txt: impl ToUiString,
-    message: impl Message,
-    v: &mut View
-) {
-    let cls = move |button: &mut Button| button.on_release(message);
+fn text_button(txt: impl ToUiString, msg: impl Message, v: &mut View) {
+    let cls = move |button: &mut Button| button.on_release(msg);
     button_begin((text_button_cls, cls), v);
         text(txt, light_text_cls, v);
     end(v);
 }
 
-fn small_text_button(
-    txt: impl ToUiString,
-    message: impl Message,
-    v: &mut View
-) {
-    let cls = move |button: &mut Button| button.on_release(message);
+fn small_text_button(txt: impl ToUiString, msg: impl Message, v: &mut View) {
+    let cls = move |button: &mut Button| button.on_release(msg);
     button_begin((small_button_cls, cls), v);
         text(txt, light_text_cls, v);
     end(v);
@@ -145,6 +139,11 @@ fn small_text_button(
 
 
 // --------------- Classes --------------- 
+fn root_cls(d: &mut Div) {
+    d.style.flex_direction = FlexDirection::Column;
+    d.style.align_items = Some(AlignItems::Center);
+}
+
 
 fn counter_box_cls(d: &mut Div) {
     let s = &mut d.style;

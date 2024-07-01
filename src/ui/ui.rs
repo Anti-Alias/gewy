@@ -65,7 +65,7 @@ impl UI {
         let root_widget_style = style_of(&root_widget);
         let root_widget: Box<dyn Widget> = Box::new(root_widget);
         let mut widgets = TaffyTree::new();
-        let state_id = root_widget.state_id();
+        let state_id = root_widget.state_id().map(|id| id.raw());
         let root_id = widgets.new_leaf_with_context(root_widget_style, root_widget).unwrap();
         let root_id = RawWidgetId(root_id);
         let mut result = Self {
@@ -76,7 +76,7 @@ impl UI {
             cursor: Cursor::default(),
         };
         if let Some(state_id) = state_id {
-            result.bind_state(root_id, state_id)
+            result.bind_state(root_id, state_id);
         }
         result
     }
@@ -96,7 +96,7 @@ impl UI {
     }
 
     pub fn insert(&mut self, widget: impl Widget, parent_id: RawWidgetId) -> Option<RawWidgetId> {
-        let state_id = widget.state_id();
+        let state_id = widget.state_id().map(|id| id.raw());
         let disable_view = widget.state_id().is_none();
         let widget_style = style_of(&widget);
         let widget_id = self.widgets.new_leaf_with_context(widget_style, Box::new(widget)).unwrap();
@@ -215,6 +215,7 @@ impl UI {
         loop {
             let widget = self.widgets.get_node_context_mut(widget_id.0).unwrap();
             if let Some(state_id) = widget.state_id() {
+                let state_id = state_id.clone_weak();
                 widget.update(state_id, store, message);
                 return;
             }

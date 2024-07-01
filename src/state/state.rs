@@ -1,7 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 use downcast_rs::{impl_downcast, Downcast};
-use slotmap::{new_key_type, SlotMap};
-use crate::{Handle, Id};
+use slotmap::SlotMap;
+use crate::{Id, RawId};
 
 
 /// Storage for reference-counted [`State`] objects.
@@ -36,17 +36,16 @@ impl Store {
     }
 
     /// Creates a [`State`] with an initial value.
-    pub fn create<S: State>(&mut self, state: S) -> Handle<S> {
+    pub fn create<S: State>(&mut self, state: S) -> Id<S> {
         let raw_id = self.states.insert(StateObject {
             ref_count: 1,
             state: Box::new(state),
         });
-        let id = Id::from(raw_id);
-        Handle::new(id, self.sender.clone())
+        Id::new(raw_id, self.sender.clone())
     }
 
     /// Creates a [`State`] whose initial value is derived from the [`Store`].
-    pub fn init<S: State + FromStore>(&mut self) -> Handle<S> {
+    pub fn init<S: State + FromStore>(&mut self) -> Id<S> {
         let state = S::from_store(self);
         self.create(state)
     }
@@ -103,10 +102,4 @@ pub enum StateEvent {
 struct StateObject {
     ref_count: u32,
     state: Box<dyn State>,
-}
-
-
-new_key_type! {
-    /// The untyped variant of [`Id`].
-    pub struct RawId;
 }
