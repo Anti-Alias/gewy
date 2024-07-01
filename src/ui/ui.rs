@@ -130,23 +130,14 @@ impl UI {
     /// Recursively removes the specified node, and all of its descendants.
     /// Returns true if node was in fact removed.
     pub fn remove(&mut self, id: RawWidgetId) -> bool {
+        if !self.contains(id) { return false }
         let children_ids = self.widgets.children(id.0).unwrap();
         for child_id in children_ids {
             self.remove(RawWidgetId(child_id));
         }
-        match self.widgets.remove(id.0) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
-    }
-
-    /// Recursively removes the children of a [`Widget`], but not the [`Widget`] itself.
-    /// This is generally used when "rerendering" a [`Widget`].
-    pub fn remove_children(&mut self, id: RawWidgetId) {
-        let children_ids = self.widgets.children(id.0).unwrap();
-        for child_id in children_ids {
-            self.remove(RawWidgetId(child_id));
-        }
+        self.widgets.set_node_context(id.0, None).unwrap();
+        self.widgets.remove(id.0).unwrap();
+        true
     }
 
     pub fn len(&self) -> usize {
@@ -241,7 +232,11 @@ impl UI {
     /// Clears the descendants of a [`Widget`] (if any), then renders them.
     pub(crate) fn render_at(&mut self, id: RawWidgetId, font_db: &FontDB, store: &Store) {
         if !self.contains(id) { return }
-        self.remove_children(id);
+        let children_ids = self.widgets.children(id.0).unwrap();
+        for child_id in children_ids {
+            let child_id = RawWidgetId(child_id);
+            self.remove(child_id);
+        }
         let Some(widget) = self.widgets.get_node_context(id.0) else { return };
         let widget: &dyn Widget = unsafe {
             let widget = widget.as_ref();
