@@ -44,7 +44,11 @@ pub trait Widget: Downcast {
 
     /// Renders descendant [`Widget`]s.
     #[allow(unused)]
-    fn view(&self, store: &Store, v: &mut View) {}
+    fn view(&self, store: &Store, v: &mut View) {
+        if self.state_id().is_none() {
+            panic!("view() called on stateless widget");
+        }
+    }
 }
 
 impl_downcast!(Widget);
@@ -56,21 +60,21 @@ pub struct View<'a> {
     current: RawWidgetId,
     last: Option<RawWidgetId>,
     ancestors: SmallVec<[RawWidgetId; 8]>,
-    font_db: &'a FontDB,
+    fonts: &'a FontDB,
 }
 
 impl<'a> View<'a> {
     pub(crate) fn new(
         ui: &'a mut UI,
         starting_node: RawWidgetId,
-        font_db: &'a FontDB,
+        fonts: &'a FontDB,
     ) -> Self {
         Self {
             ui,
             current: starting_node,
             last: None,
             ancestors: SmallVec::new(),
-            font_db,
+            fonts,
         }
     }
 
@@ -110,8 +114,8 @@ impl<'a> View<'a> {
     }
 
     /// A database of fonts to be queried during [`Widget`] construction.
-    pub fn font_db(&self) -> &FontDB {
-        &self.font_db
+    pub fn fonts(&self) -> &FontDB {
+        &self.fonts
     }
 
     /// Gets a [`Widget`] by id.

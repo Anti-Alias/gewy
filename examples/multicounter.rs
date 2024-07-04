@@ -1,3 +1,4 @@
+use multicounter::multicounter;
 use gewy::kurbo::RoundedRectRadii;
 use gewy::peniko::Color;
 use gewy::*;
@@ -6,11 +7,14 @@ use gewy::taffy::*;
 fn main() {
     env_logger::init();
     let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
-    App::new(fonts).start(|ctx| {
-        let state   = multicounter::create_state(&mut ctx.store);
-        let widget  = multicounter::create_widget(state);
-        ctx.add_window(Window::new(512, 512, widget));
-    });
+    App::new(fonts)
+        .on(AppEvent::Start, |ctx| ctx.create_window(512, 512, root))
+        .start();
+}
+
+fn root(store: &mut Store, v: &mut View) {
+    let state = multicounter::init(store);
+    multicounter(state, v);
 }
 
 /// -------------- MULTICOUNTER ---------------------
@@ -57,11 +61,7 @@ mod multicounter {
         end(v);
     }
 
-    pub fn create_widget(state: Id<State>) -> impl Widget {
-        Comp::root(state, update, view).with_name("multicounter")
-    }
-
-    pub fn create_state(store: &mut Store) -> Id<State> {
+    pub fn init(store: &mut Store) -> Id<State> {
         let state = State {
             counter_sum: 0,
             counters: vec![
@@ -69,6 +69,11 @@ mod multicounter {
             ],
         };
         store.create(state)
+    }
+
+    pub fn multicounter(state: Id<State>, v: &mut View) {
+        let widget = Comp::root(state, update, view).with_name("app");
+        v.insert(widget);
     }
 }
 

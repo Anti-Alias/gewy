@@ -1,19 +1,18 @@
 use gewy::kurbo::RoundedRectRadii;
 use gewy::peniko::Color;
-use gewy::{div, div_begin, end, margin_all, pc, px, size, size_all, text, App, Div, FontDB, Text, TextAlign, View, Wid, Window};
+use gewy::{div, div_begin, end, margin_all, pc, px, size, size_all, text, App, AppEvent, Div, FontDB, Store, Text, TextAlign, View};
 use gewy::taffy::*;
 
 fn main() {
     env_logger::init();
     let fonts = FontDB::load("assets/fonts/Roboto-Regular.ttf").unwrap();
-    App::new(fonts).start(|ctx| {
-        let widget = Wid::root(simple_fn);
-        ctx.add_window(Window::new(512, 512, widget));
-    });
+    App::new(fonts)
+        .on(AppEvent::Start, |ctx| ctx.create_window(512, 512, root))
+        .start();
 }
 
 // View function
-fn simple_fn(v: &mut View) {
+fn root(_store: &mut Store, v: &mut View) {
     div_begin(root_cls, v);
         div(red_cls, v);
         div_begin(gray_cls, v);

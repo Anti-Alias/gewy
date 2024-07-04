@@ -1,76 +1,93 @@
 use slotmap::SlotMap;
+use taffy::{AlignItems, Dimension, JustifyContent};
 use wgpu::{Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId as WinitWindowId;
-use crate::{FontDB, InputEvent, Store, Window, WindowGraphics, WindowId};
+use crate::{Div, FontDB, InputEvent, Store, View, Window, WindowGraphics, WindowId, UI};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct App {
-    font_db: FontDB,
+    fonts: FontDB,
     store: Store,
+    listeners: Vec<Box<dyn AppListener>>,
 }
-
 impl App {
     
-    pub fn new(font_db: FontDB) -> Self {
+    pub fn new(fonts: FontDB) -> Self {
         Self {
-            font_db,
+            fonts,
             store: Store::new(),
+            listeners: vec![],
         }
     }
 
-    /// Starts the application. Blocks until closed.
-    pub fn start<F>(self, mut startup: F)
+    pub fn on<F, R>(mut self, event: AppEvent, callback: F) -> Self
     where
-        F: FnMut(&mut AppCtx),
+        F: Fn(&mut AppCtx) -> R + 'static
     {
-        let mut ctx = AppCtx {
+        let listener = move |ctx: &mut AppCtx, evt: AppEvent| {
+            if evt == event {
+                callback(ctx);
+            }
+        };
+        self.listeners.push(Box::new(listener));
+        self
+    }
+
+    pub fn add_listener(&mut self, listener: impl AppListener) {
+        self.listeners.push(Box::new(listener));
+    }
+
+    /// Starts the application. Blocks until closed.
+    pub fn start(self) {
+        let ctx = AppCtx {
             store: self.store,
             instance: Instance::new(InstanceDescriptor::default()),
             windows: SlotMap::default(),
-            font_db: self.font_db,
-            event_handler: None,
+            fonts: self.fonts,
         };
-        startup(&mut ctx);
-        
-
         let event_loop: EventLoop<AppEvent> = EventLoop::with_user_event().build().unwrap();
-        let proxy = event_loop.create_proxy();
-        let mut listener = AppListener::new(ctx, proxy);
+        let mut listener = AppHandler::new(ctx, self.listeners, event_loop.create_proxy());
         event_loop.set_control_flow(ControlFlow::Wait);
         event_loop.run_app(&mut listener).unwrap();
     }
 }
 
-struct AppListener {
+struct AppHandler {
     ctx: AppCtx,
+    listeners: Vec<Box<dyn AppListener>>,
     _event_handler: Option<Box<dyn FnMut(&mut AppCtx, AppEvent)>>,
-    _proxy: EventLoopProxy<AppEvent>,
+    proxy: EventLoopProxy<AppEvent>,
     started: bool,
 }
 
-impl AppListener {
-    fn new(ctx: AppCtx, proxy: EventLoopProxy<AppEvent>) -> Self {
+impl AppHandler {
+    fn new(
+        ctx: AppCtx,
+        listeners: Vec<Box<dyn AppListener>>,
+        proxy: EventLoopProxy<AppEvent>,
+    ) -> Self {
         Self {
             ctx,
+            listeners,
             _event_handler: None,
-            _proxy: proxy,
+            proxy,
             started: false,
         }
     }
 }
 
-impl ApplicationHandler<AppEvent> for AppListener {
+impl ApplicationHandler<AppEvent> for AppHandler {
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.started {
-            self.ctx.create_window_graphics(event_loop);
-            self.ctx.render_windows();
-            self.started = true;
+            log::info!("App starting");
+            self.proxy.send_event(AppEvent::Start).unwrap();
         }
         else {
+            log::info!("App resuming");
             self.ctx.create_window_graphics(event_loop);
         }
         log::info!("{} window(s) created", self.ctx.windows.len());
@@ -78,6 +95,7 @@ impl ApplicationHandler<AppEvent> for AppListener {
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
         self.ctx.destroy_window_graphics();
+        log::info!("App suspended");
     }
 
     fn window_event(
@@ -106,7 +124,7 @@ impl ApplicationHandler<AppEvent> for AppListener {
         let states_changed = self.ctx.store.handle_events();
         if !states_changed.is_empty() {
             for window in self.ctx.windows.values_mut() {
-                window.inform_state_changes(&states_changed, &self.ctx.font_db, &self.ctx.store);
+                window.inform_state_changes(&states_changed, &self.ctx.fonts, &self.ctx.store);
             }
         }
 
@@ -115,10 +133,18 @@ impl ApplicationHandler<AppEvent> for AppListener {
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-        let Some(mut event_handler) = self.ctx.event_handler.take() else { return };
-        event_handler(&mut self.ctx, event);
-        self.ctx.event_handler = Some(event_handler);
-        self.ctx.create_window_graphics(event_loop);
+        match event {
+            AppEvent::Start => {
+                for listener in &self.listeners {
+                    listener.handle(&mut self.ctx, AppEvent::Start);
+                }
+                self.ctx.create_window_graphics(event_loop);
+                self.ctx.render_windows();
+                log::info!("App started");
+                self.started = true;
+            },
+            AppEvent::Stop => {},
+        }
     }
 }
 
@@ -129,22 +155,34 @@ pub struct AppCtx {
     pub store: Store,
     instance: Instance,
     windows: SlotMap<WindowId, Window>,
-    font_db: FontDB,
-    event_handler: Option<Box<dyn FnMut(&mut Self, AppEvent)>>,
+    fonts: FontDB,
 }
 
 impl AppCtx {
 
-    pub fn add_window(&mut self, window: Window) -> WindowId {
-        self.windows.insert(window)
+    pub fn create_window<F>(&mut self, width: u32, height: u32, view_fn: F) -> WindowId
+    where
+        F: FnOnce(&mut Store, &mut View)
+    {
+        // Builds root div
+        let mut div = Div::default();
+        div.style.size.width = Dimension::Percent(1.0);
+        div.style.size.height = Dimension::Percent(1.0);
+        div.style.justify_content = Some(JustifyContent::Center);
+        div.style.align_items = Some(AlignItems::Center);
+
+        // Builds initial UI
+        let mut ui = UI::new(div);
+        let ui_root = ui.root_id();
+        let mut view = View::new(&mut ui, ui_root, &self.fonts);
+        view_fn(&mut self.store, &mut view);
+
+        // Shows window
+        self.windows.insert(Window::new(width, height, ui))
     }
 
     pub fn remove_window(&mut self, window_id: WindowId) -> Option<Window> {
         self.windows.remove(window_id)
-    }
-
-    pub fn set_event_handler(&mut self, event_handler: impl FnMut(&mut AppCtx, AppEvent) + 'static) {
-        self.event_handler = Some(Box::new(event_handler));
     }
 
     fn get_window_winit(&mut self, winit_id: WinitWindowId) -> Option<(&mut Window, &mut Store)> {
@@ -171,8 +209,8 @@ impl AppCtx {
             if window.graphics.is_some() { continue };
             window.graphics = Some(WindowGraphics::new(
                 &self.instance,
-                window.content_width,
-                window.content_height,
+                window.width,
+                window.height,
                 event_loop
             ));
         }
@@ -186,14 +224,27 @@ impl AppCtx {
 
     fn render_windows(&mut self) {
         for window in self.windows.values_mut() {
-            window.render(&self.font_db, &self.store);
+            window.render(&self.fonts, &self.store);
             window.compute_layout();
         }
     }
 }
 
+pub trait AppListener: 'static {
+    fn handle(&self, ctx: &mut AppCtx, event: AppEvent);
+}
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+impl<F> AppListener for F
+where
+    F: Fn(&mut AppCtx, AppEvent) + 'static
+{
+    fn handle(&self, ctx: &mut AppCtx, event: AppEvent) {
+        self(ctx, event);
+    }
+}
+
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum AppEvent {
     Start,
     Stop,

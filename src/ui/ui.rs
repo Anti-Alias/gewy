@@ -61,24 +61,24 @@ pub struct UI {
 
 impl UI {
 
-    pub fn new(root_widget: impl Widget + 'static) -> Self {
-        let root_widget_style = style_of(&root_widget);
-        let root_widget: Box<dyn Widget> = Box::new(root_widget);
-        let mut widgets = TaffyTree::new();
-        let state_id = root_widget.state_id().map(|id| id.raw());
-        let root_id = widgets.new_leaf_with_context(root_widget_style, root_widget).unwrap();
-        let root_id = RawWidgetId(root_id);
-        let mut result = Self {
-            root_id,
+    /// Creates a UI with the specified [`Widget`] as its root.
+    pub fn new(widget: impl Widget + 'static) -> Self {
+        let mut widgets: TaffyTree<Box<dyn Widget>> = TaffyTree::new();
+        let style = style_of(&widget);
+        let is_stateful = widget.state_id().is_some();
+        let id = widgets.new_leaf_with_context(style, Box::new(widget)).unwrap();
+        let id = RawWidgetId(id);
+        let mut to_render = vec![];
+        if is_stateful {
+            to_render.push(id);
+        }
+        Self {
+            root_id: id,
             widgets,
             state_bindings: HashMap::new(),
-            to_render: vec![root_id],
+            to_render: vec![],
             cursor: Cursor::default(),
-        };
-        if let Some(state_id) = state_id {
-            result.bind_state(root_id, state_id);
         }
-        result
     }
 
     pub fn root_id(&self) -> RawWidgetId { self.root_id }
@@ -96,8 +96,8 @@ impl UI {
     }
 
     pub fn insert(&mut self, widget: impl Widget, parent_id: RawWidgetId) -> Option<RawWidgetId> {
-        let state_id = widget.state_id().map(|id| id.raw());
-        let disable_view = widget.state_id().is_none();
+        // Inserts widget
+        let widget_state = widget.state_id().map(|id| id.raw());
         let widget_style = style_of(&widget);
         let widget_id = self.widgets.new_leaf_with_context(widget_style, Box::new(widget)).unwrap();
         let widget_id = RawWidgetId(widget_id);
@@ -105,10 +105,9 @@ impl UI {
             self.widgets.remove(widget_id.0).unwrap();
             return None;
         }
-        if let Some(state_id) = state_id {
-            self.bind_state(widget_id, state_id);
-        }
-        if !disable_view {
+        // Binds state and schedules rendering for that widget
+        if let Some(widget_state) = widget_state {
+            self.bind_state(widget_id, widget_state);
             self.to_render.push(widget_id);
         }
         Some(widget_id)
@@ -217,10 +216,10 @@ impl UI {
         }
     }
 
-    pub fn render(&mut self, font_db: &FontDB, store: &Store) {
+    pub fn render(&mut self, fonts: &FontDB, store: &Store) {
         while !self.to_render.is_empty() {
             for id in std::mem::take(&mut self.to_render) {
-                self.render_at(id, font_db, store);
+                self.render_at(id, fonts, store);
             }
         }
     }

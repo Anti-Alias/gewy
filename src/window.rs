@@ -7,48 +7,44 @@ use wgpu::{Adapter, CompositeAlphaMode, Device, DeviceDescriptor, Instance, Pres
 use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window as WinitWindow, WindowAttributes};
-use crate::{FontDB, RawId, InputEvent, Store, Widget, UI};
+use crate::{FontDB, RawId, InputEvent, Store, UI};
 
 /// A window within a [`GewyApp`](crate::GewyApp).
 /// Contains a [`Widget`] tree, acting as a user interface.
 pub struct Window {
-    pub(crate) content_width: u32,
-    pub(crate) content_height: u32,
-    pub(crate) ui: UI,                 // UI DOM
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) ui: UI,                              // UI DOM
     pub(crate) graphics: Option<WindowGraphics>,    // Graphical representation of window. Populated when window is created and when app is resumed (Android).
 }
 
 impl Window {
-    pub fn new(content_width: u32, content_height: u32, widget: impl Widget) -> Self {
-        Self {
-            content_width,
-            content_height,
-            ui: UI::new(widget),
-            graphics: None,
-        }
+
+    pub fn new(width: u32, height: u32, ui: UI) -> Self {
+        Self { width, height, ui, graphics: None }
     }
 
     /// Width of the content of the window. Excludes borders.
-    pub fn content_width(&self) -> u32 { self.content_width }
+    pub fn width(&self) -> u32 { self.width }
 
     /// Height of the content of the window.  Excludes borders.
-    pub fn content_height(&self) -> u32 { self.content_height }
+    pub fn height(&self) -> u32 { self.height }
 
     pub(crate) fn resize(&mut self, width: u32, height: u32) {
         self.ui.compute_layout(width as f32, height as f32);
-        self.content_width = width;
-        self.content_height = height;
+        self.width = width;
+        self.height = height;
         if let Some(graphics) = &mut self.graphics {
             graphics.resize(width, height);
         }
     }
 
-    pub(crate) fn render(&mut self, font_db: &FontDB, store: &Store) {
-        self.ui.render(font_db, store);
+    pub(crate) fn render(&mut self, fonts: &FontDB, store: &Store) {
+        self.ui.render(fonts, store);
     }
 
     pub(crate) fn compute_layout(&mut self) {
-        self.ui.compute_layout(self.content_width as f32, self.content_height as f32);
+        self.ui.compute_layout(self.width as f32, self.height as f32);
     }
 
     pub(crate) fn paint(&mut self) {
@@ -60,12 +56,12 @@ impl Window {
         self.ui.fire_input_event(event, store);
     }
 
-    pub fn inform_state_changes(&mut self, state_ids: &[RawId], font_db: &FontDB, store: &Store) {
+    pub fn inform_state_changes(&mut self, state_ids: &[RawId], fonts: &FontDB, store: &Store) {
         let num_updates = self.ui.inform_state_changes(state_ids);
         if num_updates != 0 {
             let root_id = self.ui.root_id();
-            self.ui.render(font_db, store);
-            self.ui.compute_layout_at(root_id, self.content_width as f32, self.content_height as f32);
+            self.ui.render(fonts, store);
+            self.ui.compute_layout_at(root_id, self.width as f32, self.height as f32);
             let Some(graphics) = &mut self.graphics else { return };
             graphics.winit_window.request_redraw();
         }

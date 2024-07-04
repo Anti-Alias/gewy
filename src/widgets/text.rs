@@ -137,7 +137,7 @@ pub fn text(string: impl ToUiString, class: impl Class<Text>, v: &mut View) -> W
     };
     class.apply(&mut text);
     // Finalizes text
-    let font = v.font_db().query(&text.font).clone();
+    let font = v.fonts().query(&text.font).clone();
     text._font = Some(font);
     // Inserts text
     v.insert(text)
