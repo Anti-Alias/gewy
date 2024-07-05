@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use taffy::Style;
-use crate::{root_style, DynMapper, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
+use crate::{root_style, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
 
 
 /// An inline [`Widget`] not bound to any state.
@@ -62,78 +62,72 @@ impl<V: ViewFn> Widget for Wid<V> {
     }
 }
 
-/// A "component" is an inline [`Widget`] bound to some state.
+/// A component is an inline [`Widget`] bound to some state.
 /// Its descendants are populated using a view function which takes its state as an argument.
 /// Descendants are generated immediately after insertion.
 /// Descendants are regenerated whenever the state changes.
 /// Useful as a "root widget" in an application.
-pub struct Comp<S, M, U, V>
+pub struct Comp<S, M, U, V, A>
 where
     S: State,
     M: Message,
     U: UpdateFn<S, M>,
     V: StateViewFn<S>,
+    A: Mapper,
 {
-    name: UiString,
+    name: &'static str,
     style: Style,
     state_id: Id<S>,
-    mapper: DynMapper,
+    mapper: A,
     update: U,
     view: V,
     phantom: PhantomData<M>,
 }
 
-impl<S, M, U, V> Comp<S, M, U, V>
+impl<S, M, U, V, A> Comp<S, M, U, V, A>
 where
     S: State,
     M: Message,
     U: UpdateFn<S, M>,
     V: StateViewFn<S>,
+    A: Mapper,
 {
     /// Creates a stateful [`Widget`] implementation using a [`State`], an update function and a view function.
     pub fn new(
+        name: &'static str,
         state_id: Id<S>,
-        mapper: impl Mapper,
         update_fn: U,
+        mapper: A,
         view_fn: V,
     ) -> Self {
         Self {
-            name: "comp".into(),
+            name,
             style: Style::DEFAULT,
             state_id,
-            mapper: DynMapper::from(mapper),
             update: update_fn,
+            mapper,
             view: view_fn,
             phantom: PhantomData,
         }
-    }
-
-    pub fn with_name(mut self, name: impl ToUiString) -> Self {
-        self.name = name.to_ui_string();
-        self
     }
 
     pub fn with_style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
-
-    pub fn with_root_style(mut self) -> Self {
-        self.style = root_style();
-        self
-    }
 }
 
 
-impl<S, M, U, V> Widget for Comp<S, M, U, V>
+impl<S, M, U, V, A> Widget for Comp<S, M, U, V, A>
 where
     S: State,
     M: Message,
     U: UpdateFn<S, M>,
     V: StateViewFn<S>,
+    A: Mapper,
 {
 
-    fn name(&self) -> &str { &self.name }
+    fn name(&self) -> &str { self.name }
 
     fn style(&self, style: &mut Style) {
         *style = self.style.clone();
