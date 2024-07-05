@@ -1,7 +1,4 @@
-use gewy::kurbo::RoundedRectRadii;
-use gewy::peniko::Color;
-use gewy::{div, div_begin, end, margin_all, pc, px, size, size_all, text, App, AppEvent, Div, FontDB, Store, Text, TextAlign, View};
-use gewy::taffy::*;
+use gewy::prelude::*;
 
 fn main() {
     env_logger::init();
@@ -13,68 +10,71 @@ fn main() {
 
 // View function
 fn root(_store: &mut Store, v: &mut View) {
-    div_begin(root_cls, v);
-        div(red_cls, v);
-        div_begin(gray_cls, v);
-            div(green_cls, v);
-            text("This is some text!", text_cls, v);
-            div(yellow_cls, v);
+    col(cls::root, v).begin();
+        div(cls::red, v);
+        col(cls::gray, v).begin();
+            div(cls::green, v);
+            text("This is some text!", cls::text, v);
+            div(cls::yellow, v);
         end(v);
-        div(blue_cls, v);
+        div(cls::blue, v);
     end(v);
 }
 
 
 // ---------- Class functions ----------
-fn root_cls(div: &mut Div) {
-    let s = &mut div.style;
-    s.size.width = pc(1.0);
-    s.size.height = pc(1.0);
-    s.flex_direction = FlexDirection::Column;
-    s.justify_content = Some(JustifyContent::Center);
-    s.align_items = Some(AlignItems::Center);
-}
+mod cls {
 
-fn text_cls(t: &mut Text) {
-    t.color = Color::BLACK;
-    t.text_align = TextAlign::Center;
-}
+    use gewy::prelude::*;
 
-fn red_cls(d: &mut Div) {
-    d.radii = RoundedRectRadii::from_single_radius(5.0);
-    d.style.size = size_all(px(32));
-    d.color = Color::RED;
-}
+    pub fn root(div: &mut Div) {
+        let s = &mut div.style;
+        s.size.width = pc(1.0);
+        s.size.height = pc(1.0);
+        s.justify_content = Some(JustifyContent::Center);
+        s.align_items = Some(AlignItems::Center);
+    }
 
-fn yellow_cls(d: &mut Div) {
-    let s = &mut d.style;
-    d.radii = RoundedRectRadii::from_single_radius(5.0);
-    d.color = Color::YELLOW;
-    s.size = size_all(px(64));
-    s.margin = margin_all(px(5));
-    s.size = size_all(px(32));
-}
+    pub fn text(t: &mut Text) {
+        t.color = Color::BLACK;
+        t.text_align = TextAlign::Center;
+    }
 
-fn green_cls(d: &mut Div) {
-    d.radii = RoundedRectRadii::from_single_radius(5.0);
-    d.style.size = size_all(px(32));
-    d.color = Color::GREEN;
-    d.style.margin = margin_all(px(5));
-}
+    pub fn red(d: &mut Div) {
+        d.radii = RoundedRectRadii::from_single_radius(5.0);
+        d.style.size = size_all(px(32));
+        d.color = Color::RED;
+    }
 
-fn blue_cls(d: &mut Div) {
-    d.radii = RoundedRectRadii::from_single_radius(5.0);
-    d.style.size = size_all(px(32));
-    d.color = Color::BLUE;
-}
+    pub fn yellow(d: &mut Div) {
+        let s = &mut d.style;
+        d.radii = RoundedRectRadii::from_single_radius(5.0);
+        d.color = Color::YELLOW;
+        s.size = size_all(px(64));
+        s.margin = margin_all(px(5));
+        s.size = size_all(px(32));
+    }
 
-fn gray_cls(d: &mut Div) {
-    let s = &mut d.style;
-    d.radii = RoundedRectRadii::from_single_radius(20.0);
-    d.color = Color::GRAY;
-    s.flex_direction = FlexDirection::Column;
-    s.justify_content = Some(JustifyContent::Center);
-    s.align_items = Some(AlignItems::Center);
-    s.flex_direction = FlexDirection::Column;
-    s.size = size(pc(0.8), px(256));
+    pub fn green(d: &mut Div) {
+        d.radii = RoundedRectRadii::from_single_radius(5.0);
+        d.style.size = size_all(px(32));
+        d.color = Color::GREEN;
+        d.style.margin = margin_all(px(5));
+    }
+
+    pub fn blue(d: &mut Div) {
+        d.radii = RoundedRectRadii::from_single_radius(5.0);
+        d.style.size = size_all(px(32));
+        d.color = Color::BLUE;
+    }
+
+    pub fn gray(d: &mut Div) {
+        let s = &mut d.style;
+        d.radii = RoundedRectRadii::from_single_radius(20.0);
+        d.color = Color::GRAY;
+        s.flex_direction = FlexDirection::Column;
+        s.justify_content = Some(JustifyContent::Center);
+        s.align_items = Some(AlignItems::Center);
+        s.size = size(pc(0.8), px(256));
+    }
 }

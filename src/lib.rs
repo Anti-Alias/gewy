@@ -28,4 +28,8 @@ pub use vello::kurbo as kurbo;
 
 pub mod prelude {
     pub use crate::*;
+    pub use crate::taffy::style::*;
+    pub use crate::vello::*;
+    pub use crate::kurbo::*;
+    pub use crate::peniko::Color;
 }

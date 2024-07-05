@@ -1,7 +1,7 @@
 mod widgets;
 
 use gewy::prelude::*;
-use widgets::multicounter::*;
+use widgets::counter::{counter, CounterState};
 
 
 fn main() {
@@ -17,12 +17,12 @@ fn start(ctx: &mut AppCtx) {
 }
 
 fn view(store: &mut Store, v: &mut View) {
-    let state = store.init::<MulticounterState>();
+    let state = store.init::<CounterState>();
     col(cls::center, v).begin();
         div(cls::title_box, v).begin();
-            text("Multicounter Example!", (), v);
+            text("Counter Example!", (), v);
         end(v);
-        multicounter(state, v);
+        counter(state, (), v);
     end(v);
 }
 
@@ -30,7 +30,7 @@ fn view(store: &mut Store, v: &mut View) {
 
 mod cls {
     use gewy::*;
-    use taffy::AlignItems;
+    use gewy::taffy::*;
 
     pub fn center(d: &mut Div) {
         d.style.align_items = Some(AlignItems::Center);

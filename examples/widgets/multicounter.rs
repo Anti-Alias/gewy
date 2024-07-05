@@ -1,5 +1,5 @@
-use gewy::*;
-use crate::counter::*;
+use gewy::prelude::*;
+use crate::widgets::counter::{counter, CounterState, CounterEvent};
 
 type UParams<'a> = UpdateParams<'a, MulticounterState, MulticounterMsg>;
 type VParams<'a, 'b> = ViewParams<'a, 'b, MulticounterState>;
@@ -44,13 +44,13 @@ fn view(mut params: VParams) {
     let add_mapper = (ButtonEvent::Released, MulticounterMsg::Add);
     let rem_mapper = (ButtonEvent::Released, MulticounterMsg::Remove);
     let count_mapper = (CounterEvent::Changed, MulticounterMsg::Sync);
-    let sum_str = format!("Total: {}", state.counter_sum);
-    div_begin(cls::root, v);
-        text(sum_str, (), v);
+    let total = format!("Total: {}", state.counter_sum);
+    col(cls::root, v).begin();
+        text(total, cls::nop, v);
         for counter_id in &state.counters {
             counter(counter_id.clone(), count_mapper, v);
         }
-        div_begin((), v);
+        row(cls::nop, v).begin();
             if state.counters.len() < 6 {
                 text_button("Add Counter", add_mapper, v);
             }
@@ -93,8 +93,9 @@ mod cls {
     use gewy::*;
     use crate::*;
 
+    pub fn nop<W>(_w: &mut W) {}
+
     pub fn root(d: &mut Div) {
-        d.style.flex_direction = FlexDirection::Column;
         d.style.align_items = Some(AlignItems::Center);
     }
 

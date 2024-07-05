@@ -1,11 +1,7 @@
-use gewy::*;
-use kurbo::RoundedRectRadii;
-use peniko::Color;
-use taffy::{AlignItems, Dimension, JustifyContent};
+use gewy::prelude::*;
 
 type UParams<'a> = UpdateParams<'a, CounterState, CounterMsg>;
 type VParams<'a, 'b> = ViewParams<'a, 'b, CounterState>;
-
 
 pub fn counter(state: Id<CounterState>, mapper: impl Mapper, v: &mut View) {
     let widget = Comp::new("counter", state, update, mapper, view);
@@ -34,9 +30,9 @@ fn view(mut params: VParams) {
     let txt = format!("Count: {}", state.0);
     let inc_map = (ButtonEvent::Released, CounterMsg::Increment);
     let dec_map = (ButtonEvent::Released, CounterMsg::Decrement);
-    col_begin(counter_box_cls, v);
+    col(counter_box_cls, v).begin();
         text(txt, dark_text_cls, v);
-        row_begin(small_box_cls, v);
+        row(small_box_cls, v).begin();
             small_text_button("+", inc_map, v);
             small_text_button("-", dec_map, v);
         end(v);
