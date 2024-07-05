@@ -10,14 +10,14 @@ fn main() {
 
 // View function
 fn root(_store: &mut Store, v: &mut View) {
-    col(cls::root, v).begin();
-        div(cls::red, v);
-        col(cls::gray, v).begin();
-            div(cls::green, v);
-            text("This is some text!", cls::text, v);
-            div(cls::yellow, v);
+    col(cls::root).beg(v);
+        div(cls::red).ins(v);
+        col(cls::gray).beg(v);
+            div(cls::green).ins(v);
+            text("This is some text!", cls::text).ins(v);
+            div(cls::yellow).ins(v);
         end(v);
-        div(cls::blue, v);
+        div(cls::blue).ins(v);
     end(v);
 }
 

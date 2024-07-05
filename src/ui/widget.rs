@@ -31,6 +31,10 @@ pub trait Widget: Downcast {
     /// Raw ID 
     fn state_id(&self) -> Option<&UntypedId> { None }
 
+    /// Initializes the widget
+    #[allow(unused)]
+    fn init(&mut self, fonts: &FontDB) {}
+
     #[allow(unused)]
     fn update(&self, store: &mut Store, message: DynMessage) -> Option<DynMessage> {
         Some(message)

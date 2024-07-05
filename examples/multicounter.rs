@@ -18,9 +18,9 @@ fn start(ctx: &mut AppCtx) {
 
 fn view(store: &mut Store, v: &mut View) {
     let state = store.init::<MulticounterState>();
-    col(cls::center, v).begin();
-        div(cls::title_box, v).begin();
-            text("Multicounter Example!", (), v);
+    col(cls::center).beg(v);
+        div(cls::title_box).beg(v);
+            text("Multicounter Example!", cls::nop).ins(v);
         end(v);
         multicounter(state, v);
     end(v);
@@ -31,6 +31,8 @@ fn view(store: &mut Store, v: &mut View) {
 mod cls {
     use gewy::*;
     use taffy::AlignItems;
+
+    pub fn nop<W>(_w: &mut W) {}
 
     pub fn center(d: &mut Div) {
         d.style.align_items = Some(AlignItems::Center);

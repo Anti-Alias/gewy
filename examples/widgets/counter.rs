@@ -30,9 +30,9 @@ fn view(mut params: VParams) {
     let txt = format!("Count: {}", state.0);
     let inc_map = (ButtonEvent::Released, CounterMsg::Increment);
     let dec_map = (ButtonEvent::Released, CounterMsg::Decrement);
-    col(counter_box_cls, v).begin();
-        text(txt, dark_text_cls, v);
-        row(small_box_cls, v).begin();
+    col(counter_box_cls).beg(v);
+        text(txt, dark_text_cls).ins(v);
+        row(small_box_cls).beg(v);
             small_text_button("+", inc_map, v);
             small_text_button("-", dec_map, v);
         end(v);
@@ -42,7 +42,7 @@ fn view(mut params: VParams) {
 
 fn small_text_button(txt: impl ToUiString, mapper: impl Mapper, v: &mut View) {
     button_begin(small_button_cls, mapper, v);
-        text(txt, light_text_cls, v);
+        text(txt, light_text_cls).ins(v);
     end(v);
 }
 

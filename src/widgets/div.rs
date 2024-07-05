@@ -1,6 +1,6 @@
 use taffy::FlexDirection;
 
-use crate::{Class, View, Widget};
+use crate::{Class, View, Widget, WidgetId};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -11,6 +11,21 @@ pub struct Div {
     pub style: Style,
     pub color: Color,
     pub radii: RoundedRectRadii,
+}
+
+impl Div {
+
+    #[inline(always)]
+    pub fn ins(self, v: &mut View) -> WidgetId<Self> {
+        v.insert(self)
+    }
+
+    #[inline(always)]
+    pub fn beg(self, v: &mut View) -> WidgetId<Self> {
+        let id = v.insert(self);
+        v.begin();
+        id
+    }
 }
 
 impl Widget for Div {
@@ -35,24 +50,21 @@ impl Widget for Div {
 }
 
 /// Widget function for [`Div`].
-pub fn div<'a, 'b>(class: impl Class<Div>, v: &'a mut View<'b>) -> &'a mut View<'b> {
-    let div = class.produce();
-    v.insert(div);
-    v
+pub fn div(class: impl Class<Div>) -> Div {
+    class.produce()
 }
 
 /// Displays contents left to right. Alias for [`div`].
 #[inline(always)]
-pub fn row<'a, 'b>(class: impl Class<Div>, v: &'a mut View<'b>) -> &'a mut View<'b> {
-    div(class, v)
+pub fn row(class: impl Class<Div>) -> Div {
+    class.produce()
 }
 
 
 /// Alias for [`div`]. Displays contents top to bottom.
-pub fn col<'a, 'b>(class: impl Class<Div>, v: &'a mut View<'b>) -> &'a mut View<'b> {
+pub fn col(class: impl Class<Div>) -> Div {
     let mut d = Div::default();
-    class.apply(&mut d);
     d.style.flex_direction = FlexDirection::Column;
-    v.insert(d);
-    v
+    class.apply(&mut d);
+    d
 }

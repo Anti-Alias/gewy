@@ -176,6 +176,7 @@ impl AppCtx {
         let ui_root = ui.root_id();
         let mut view = View::new(&mut ui, ui_root, &self.fonts);
         view_fn(&mut self.store, &mut view);
+        ui.init(ui_root, &self.fonts);
 
         // Shows window
         self.windows.insert(Window::new(width, height, ui))

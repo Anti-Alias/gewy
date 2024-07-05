@@ -45,12 +45,12 @@ fn view(mut params: VParams) {
     let rem_mapper = (ButtonEvent::Released, MulticounterMsg::Remove);
     let count_mapper = (CounterEvent::Changed, MulticounterMsg::Sync);
     let total = format!("Total: {}", state.counter_sum);
-    col(cls::root, v).begin();
-        text(total, cls::nop, v);
+    col(cls::root).beg(v);
+        text(total, cls::nop).ins(v);
         for counter_id in &state.counters {
             counter(counter_id.clone(), count_mapper, v);
         }
-        row(cls::nop, v).begin();
+        row(cls::nop).beg(v);
             if state.counters.len() < 6 {
                 text_button("Add Counter", add_mapper, v);
             }
@@ -83,7 +83,7 @@ fn compute_sum(params: &mut UParams) {
 
 fn text_button(txt: impl ToUiString, mapper: impl Mapper, v: &mut View) {
     button_begin(cls::text_button, mapper, v);
-        text(txt, cls::light_text, v);
+        text(txt, cls::light_text).ins(v);
     end(v);
 }
 

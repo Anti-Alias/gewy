@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::ops::DerefMut;
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
 use crate::{DynMessage, FontDB, InputMessage, MouseButton, RawId, Store, View, Widget};
@@ -75,7 +76,7 @@ impl UI {
             root_id: id,
             widgets,
             state_bindings: HashMap::new(),
-            to_render: vec![],
+            to_render,
             cursor: Cursor::default(),
         }
     }
@@ -110,6 +111,12 @@ impl UI {
             self.to_render.push(widget_id);
         }
         Some(widget_id)
+    }
+
+    /// Recursively initializes widgets
+    pub(crate) fn init(&mut self, widget_id: RawWidgetId, fonts: &FontDB) {
+        let mut init = move |widget: &mut dyn Widget| widget.init(fonts);
+        self.update(widget_id, &mut init);
     }
 
     pub fn bind_state(&mut self, widget_id: RawWidgetId, state_id: RawId) {
@@ -225,20 +232,21 @@ impl UI {
     }
 
     /// Clears the descendants of a [`Widget`] (if any), then renders them.
-    pub(crate) fn render_at(&mut self, id: RawWidgetId, font_db: &FontDB, store: &Store) {
-        if !self.contains(id) { return }
-        let children_ids = self.widgets.children(id.0).unwrap();
+    pub(crate) fn render_at(&mut self, widget_id: RawWidgetId, fonts: &FontDB, store: &Store) {
+        if !self.contains(widget_id) { return }
+        let children_ids = self.widgets.children(widget_id.0).unwrap();
         for child_id in children_ids {
             let child_id = RawWidgetId(child_id);
             self.remove(child_id);
         }
-        let Some(widget) = self.widgets.get_node_context(id.0) else { return };
+        let Some(widget) = self.widgets.get_node_context(widget_id.0) else { return };
         let widget: &dyn Widget = unsafe {
             let widget = widget.as_ref();
             std::mem::transmute(widget)
         };
-        let mut renderer = View::new(self, id, font_db);
+        let mut renderer = View::new(self, widget_id, fonts);
         widget.view(store, &mut renderer);
+        self.init(widget_id, fonts);
     }
 
     pub(crate) fn paint_root(&self, scene: &mut Scene) {
@@ -277,6 +285,19 @@ impl UI {
             let measured_size = widget.measure(size, size_available);
             measured_size
         }).unwrap();
+    }
+
+    fn update<F>(&mut self, widget_id: RawWidgetId, callback: &mut F)
+    where
+        F: FnMut(&mut dyn Widget)
+    {
+        let Some(widget) = self.widgets.get_node_context_mut(widget_id.0) else { return };
+        callback(widget.deref_mut());
+
+        for child_id in self.widgets.children(widget_id.0).unwrap() {
+            let child_id = RawWidgetId(child_id);
+            self.update(child_id, callback);
+        }
     }
 }
 
