@@ -1,8 +1,5 @@
 use gewy::prelude::*;
 
-type UParams<'a> = UpdateParams<'a, CounterState, CounterMsg>;
-type VParams<'a, 'b> = ViewParams<'a, 'b, CounterState>;
-
 pub fn counter(state: Id<CounterState>, mapper: impl Mapper, v: &mut View) {
     let widget = Comp::new("counter", state, update, mapper, view);
     v.insert(widget);
@@ -30,51 +27,59 @@ fn view(mut params: VParams) {
     let txt = format!("Count: {}", state.0);
     let inc_map = (ButtonEvent::Released, CounterMsg::Increment);
     let dec_map = (ButtonEvent::Released, CounterMsg::Decrement);
-    col(counter_box_cls).beg(v);
-        text(txt, dark_text_cls).ins(v);
-        row(small_box_cls).beg(v);
+    col(cls::counter_box).beg(v);
+        text(txt, cls::dark_text).ins(v);
+        row(cls::small_box).beg(v);
             small_text_button("+", inc_map, v);
             small_text_button("-", dec_map, v);
         end(v);
     end(v);
 }
 
-
 fn small_text_button(txt: impl ToUiString, mapper: impl Mapper, v: &mut View) {
-    button_begin(small_button_cls, mapper, v);
-        text(txt, light_text_cls).ins(v);
+    button(cls::small_button).map(mapper).beg(v);
+        text(txt, cls::light_text).ins(v);
     end(v);
 }
 
-fn small_button_cls(b: &mut Button) {
-    let s = &mut b.style;
-    b.color = Color::rgb(0.1, 0.1, 0.1);
-    b.radii = RoundedRectRadii::from(3.0);
-    s.justify_content = Some(JustifyContent::Center);
-    s.align_items = Some(AlignItems::Center);
-    s.size = size_all(px(22));
+type UParams<'a> = UpdateParams<'a, CounterState, CounterMsg>;
+type VParams<'a, 'b> = ViewParams<'a, 'b, CounterState>;
+
+mod cls {
+
+    use gewy::prelude::*;
+
+    pub fn small_button(b: &mut Button) {
+        let s = &mut b.style;
+        b.color = Color::rgb(0.1, 0.1, 0.1);
+        b.radii = RoundedRectRadii::from(3.0);
+        s.justify_content = Some(JustifyContent::Center);
+        s.align_items = Some(AlignItems::Center);
+        s.size = size_all(px(22));
+    }
+
+    pub fn counter_box(d: &mut Div) {
+        let s = &mut d.style;
+        d.color = Color::GRAY;
+        d.radii = RoundedRectRadii::from(3.0);
+        s.margin = margin_all(px(5));
+        s.padding = padding_all(px(5));
+        s.justify_content = Some(JustifyContent::Center);
+        s.align_items = Some(AlignItems::Center);
+    }
+
+    pub fn dark_text(text: &mut Text) {
+        text.color = Color::BLACK;
+    }
+
+    pub fn light_text(text: &mut Text) {
+        text.color = Color::WHITE;
+    }
+
+    pub fn small_box(d: &mut Div) {
+        let s = &mut d.style;
+        s.size.width = Dimension::Length(50.0);
+        s.justify_content = Some(JustifyContent::SpaceBetween);
+    }
 }
 
-fn counter_box_cls(d: &mut Div) {
-    let s = &mut d.style;
-    d.color = Color::GRAY;
-    d.radii = RoundedRectRadii::from(3.0);
-    s.margin = margin_all(px(5));
-    s.padding = padding_all(px(5));
-    s.justify_content = Some(JustifyContent::Center);
-    s.align_items = Some(AlignItems::Center);
-}
-
-fn dark_text_cls(text: &mut Text) {
-    text.color = Color::BLACK;
-}
-
-fn light_text_cls(text: &mut Text) {
-    text.color = Color::WHITE;
-}
-
-fn small_box_cls(d: &mut Div) {
-    let s = &mut d.style;
-    s.size.width = Dimension::Length(50.0);
-    s.justify_content = Some(JustifyContent::SpaceBetween);
-}

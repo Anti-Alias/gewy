@@ -82,7 +82,7 @@ fn compute_sum(params: &mut UParams) {
 
 
 fn text_button(txt: impl ToUiString, mapper: impl Mapper, v: &mut View) {
-    button_begin(cls::text_button, mapper, v);
+    button(cls::text_button).map(mapper).beg(v);
         text(txt, cls::light_text).ins(v);
     end(v);
 }

@@ -1,7 +1,7 @@
 mod widgets;
 
 use gewy::prelude::*;
-use widgets::counter::{counter, CounterState};
+use widgets::counter::*;
 
 
 fn main() {
@@ -29,8 +29,7 @@ fn view(store: &mut Store, v: &mut View) {
 
 
 mod cls {
-    use gewy::*;
-    use gewy::taffy::*;
+    use gewy::prelude::*;
 
     pub fn nop<W>(_w: &mut W) {}
 

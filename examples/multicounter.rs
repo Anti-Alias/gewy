@@ -29,8 +29,7 @@ fn view(store: &mut Store, v: &mut View) {
 
 
 mod cls {
-    use gewy::*;
-    use taffy::AlignItems;
+    use gewy::prelude::*;
 
     pub fn nop<W>(_w: &mut W) {}
 

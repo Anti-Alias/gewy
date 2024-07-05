@@ -1,4 +1,4 @@
-use crate::{Class, DynMapper, DynMessage, InputMessage, Mapper, MouseButton, Store, View, Widget};
+use crate::{Class, DynMapper, DynMessage, InputMessage, Mapper, MouseButton, Store, View, Widget, WidgetId};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -10,6 +10,24 @@ pub struct Button {
     pub color: Color,
     pub radii: RoundedRectRadii,
     pub mapper: DynMapper,
+}
+
+impl Button {
+    #[inline(always)]
+    pub fn ins(self, view: &mut View) -> WidgetId<Self> {
+        view.insert(self)
+    }
+
+    pub fn beg(self, view: &mut View) -> WidgetId<Self> {
+        let id = view.insert(self);
+        view.begin();
+        id
+    }
+
+    pub fn map(mut self, mapper: impl Mapper) -> Self {
+        self.mapper = DynMapper::from(mapper);
+        self
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -49,27 +67,6 @@ impl Widget for Button {
 }
 
 /// Widget function for [`Button`].
-pub fn button(
-    class: impl Class<Button>,
-    mapper: impl Mapper,
-    v: &mut View
-) {
-    let mut button = Button {
-        style: Style::DEFAULT,
-        color: Color::rgba8(0, 0, 0, 0),
-        radii: RoundedRectRadii::default(),
-        mapper: DynMapper::from(mapper),
-    };
-    class.apply(&mut button);
-    v.insert(button);
-}
-
-/// Widget function for [`Button`].
-pub fn button_begin(
-    class: impl Class<Button>,
-    mapper: impl Mapper,
-    v: &mut View,
-) {
-    button(class, mapper, v);
-    v.begin();
+pub fn button(class: impl Class<Button>) -> Button {
+    class.produce()
 }
