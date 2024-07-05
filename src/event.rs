@@ -2,7 +2,7 @@ use winit::event::{ElementState, MouseButton as WinitMouseButton};
 
 /// All events with regards to input.
 #[derive(Clone)]
-pub enum InputEvent {
+pub enum InputMessage {
     MousePressed { button: MouseButton },
     MouseReleased { button: MouseButton },
     CursorEntered,
@@ -10,7 +10,7 @@ pub enum InputEvent {
     CursorMoved { x: f32, y: f32 },
 }
 
-impl InputEvent {
+impl InputMessage {
 
     pub(crate) fn from_winit_mouse(state: ElementState, winit_button: WinitMouseButton) -> Self {
         let button = MouseButton::from_winit(winit_button);

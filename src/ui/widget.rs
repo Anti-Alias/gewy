@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{DynMessage, EventCtx, FontDB, InputEvent, RawWidgetId, Store, UntypedId, WidgetId, UI};
+use crate::{DynMessage, FontDB, RawWidgetId, Store, UntypedId, WidgetId, UI};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -23,19 +23,18 @@ pub trait Widget: Downcast {
         Size::ZERO
     }
 
-    #[allow(unused)]
-    fn event(&self, event: InputEvent, ctx: EventCtx) -> bool { true }
-
-    /// True if cursor is touching this widget.
-    fn touches(&self, cursor_x: f32, cursor_y: f32, width: f32, height: f32) -> bool {
-        cursor_x >= 0.0 && cursor_y >= 0.0 && cursor_x <= width && cursor_y <= height
+    /// True if the coordinates specified touch this [`Widget`].
+    fn touches(&self, x: f32, y: f32, width: f32, height: f32) -> bool {
+        x >= 0.0 && y >= 0.0 && x <= width && y <= height
     }
 
     /// Raw ID 
     fn state_id(&self) -> Option<&UntypedId> { None }
 
     #[allow(unused)]
-    fn update(&self, state_id: UntypedId, store: &mut Store, message: DynMessage) {}
+    fn update(&self, store: &mut Store, message: DynMessage) -> Option<DynMessage> {
+        Some(message)
+    }
 
     /// Paints this [`Widget`] onto a [`Scene`].
     /// Does not paint descendants.

@@ -5,7 +5,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId as WinitWindowId;
-use crate::{Div, FontDB, InputEvent, Store, View, Window, WindowGraphics, WindowId, UI};
+use crate::{Div, FontDB, InputMessage, Store, View, Window, WindowGraphics, WindowId, UI};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct App {
@@ -110,10 +110,10 @@ impl ApplicationHandler<AppEvent> for AppHandler {
         let ctx = &mut self.ctx;
         let Some((window, store)) = ctx.get_window_winit(winit_id) else { return };
         match event {
-            WindowEvent::CursorEntered { .. }               => window.fire_input_event(InputEvent::CursorEntered, store),
-            WindowEvent::CursorLeft { .. }                  => window.fire_input_event(InputEvent::CursorLeft, store),
-            WindowEvent::CursorMoved { position, .. }       => window.fire_input_event(InputEvent::CursorMoved { x: position.x as f32, y: position.y as f32 }, store),
-            WindowEvent::MouseInput { state, button, .. }   => window.fire_input_event(InputEvent::from_winit_mouse(state, button), store),
+            WindowEvent::CursorEntered { .. }               => window.fire_input_event(InputMessage::CursorEntered, store),
+            WindowEvent::CursorLeft { .. }                  => window.fire_input_event(InputMessage::CursorLeft, store),
+            WindowEvent::CursorMoved { position, .. }       => window.fire_input_event(InputMessage::CursorMoved { x: position.x as f32, y: position.y as f32 }, store),
+            WindowEvent::MouseInput { state, button, .. }   => window.fire_input_event(InputMessage::from_winit_mouse(state, button), store),
             WindowEvent::Resized(size)                      => window.resize(size.width, size.height),
             WindowEvent::RedrawRequested                    => window.paint(),
             WindowEvent::CloseRequested                     => ctx.remove_window_winit(winit_id, event_loop),

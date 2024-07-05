@@ -1,4 +1,4 @@
-use taffy::FlexDirection;
+use taffy::{AlignItems, FlexDirection};
 
 use crate::{Class, View, Widget, WidgetId};
 use crate::vello::Scene;
@@ -68,10 +68,10 @@ pub fn col(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
     v.insert(d)
 }
 
-/// Alias for [`div_begin`]. Displays contents top to bottom.
 #[inline(always)]
 pub fn col_begin(class: impl Class<Div>, v: &mut View) -> WidgetId<Div> {
     let mut d = Div::default();
+    d.style.align_items = Some(AlignItems::Center);
     class.apply(&mut d);
     d.style.flex_direction = FlexDirection::Column;
     let id = v.insert(d);

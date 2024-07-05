@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use taffy::Style;
-use crate::{root_style, DynMessage, Id, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
+use crate::{root_style, DynMapper, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
 
 
 /// An inline [`Widget`] not bound to any state.
@@ -77,6 +77,7 @@ where
     name: UiString,
     style: Style,
     state_id: Id<S>,
+    mapper: DynMapper,
     update: U,
     view: V,
     phantom: PhantomData<M>,
@@ -92,30 +93,17 @@ where
     /// Creates a stateful [`Widget`] implementation using a [`State`], an update function and a view function.
     pub fn new(
         state_id: Id<S>,
+        mapper: impl Mapper,
         update_fn: U,
-        view_fn: V
+        view_fn: V,
     ) -> Self {
         Self {
             name: "comp".into(),
             style: Style::DEFAULT,
             state_id,
+            mapper: DynMapper::from(mapper),
             update: update_fn,
             view: view_fn,
-            phantom: PhantomData,
-        }
-    }
-
-    pub fn root(
-        state: Id<S>,
-        update: U,
-        view: V
-    ) -> Self {
-        Self {
-            name: "root".into(),
-            style: root_style(),
-            state_id: state,
-            update,
-            view,
             phantom: PhantomData,
         }
     }
@@ -155,12 +143,22 @@ where
         Some(&self.state_id.untyped())
     }
 
-    fn update(&self, state_id: UntypedId, store: &mut Store, message: DynMessage) {
-        let state_id: Id<S> = Id::from(state_id);
-        if let Some(msg) = message.downcast_ref() {
+    fn update(&self, store: &mut Store, msg: DynMessage) -> Option<DynMessage> {
+        let state_id = self.state_id.clone_weak();
+        if let Some(msg) = msg.downcast_ref() {
             let update = &self.update;
-            let params = UpdateParams { state_id, msg, store };
+            let mut event = None;
+            let params = UpdateParams { state_id, msg, store, event: &mut event };
             update.update(params);
+            if let Some(event) = event {
+                self.mapper.map(event.as_ref())
+            }
+            else {
+                None
+            }
+        }
+        else {
+            None
         }
     }
 
@@ -250,6 +248,7 @@ where
     pub state_id: Id<S>,
     pub msg: &'a M,
     pub store: &'a mut Store,
+    event: &'a mut Option<DynMessage>,
 }
 
 impl<'a, S, M> UpdateParams<'a, S, M>
@@ -265,5 +264,10 @@ where
     #[inline(always)]
     pub fn state_mut(&mut self) -> &mut S {
         self.store.get_mut(&self.state_id)
+    }
+
+    #[inline(always)]
+    pub fn emit(self, message: impl Message) {
+        *self.event = Some(DynMessage::new(message));
     }
 }

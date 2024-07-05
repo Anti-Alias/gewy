@@ -7,7 +7,7 @@ use wgpu::{Adapter, CompositeAlphaMode, Device, DeviceDescriptor, Instance, Pres
 use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window as WinitWindow, WindowAttributes};
-use crate::{FontDB, RawId, InputEvent, Store, UI};
+use crate::{FontDB, RawId, InputMessage, Store, UI};
 
 /// A window within a [`GewyApp`](crate::GewyApp).
 /// Contains a [`Widget`] tree, acting as a user interface.
@@ -52,8 +52,8 @@ impl Window {
         graphics.paint(&self.ui);
     }
 
-    pub fn fire_input_event(&mut self, event: InputEvent, store: &mut Store) {
-        self.ui.fire_input_event(event, store);
+    pub fn fire_input_event(&mut self, event: InputMessage, store: &mut Store) {
+        self.ui.fire_input_message(event, store);
     }
 
     pub fn inform_state_changes(&mut self, state_ids: &[RawId], fonts: &FontDB, store: &Store) {
