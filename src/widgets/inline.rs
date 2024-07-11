@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use taffy::Style;
-use crate::{root_style, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, ViewCmds, Widget};
+use crate::{root_style, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
 
 
 /// An inline [`Widget`] not bound to any state.
@@ -56,7 +56,7 @@ impl<V: ViewFn> Widget for Wid<V> {
     }
 
     #[allow(unused)]
-    fn view(&self, _store: &Store) -> ViewCmds {
+    fn view(&self, _store: &Store) -> View {
         let view_fn = &self.view;
         view_fn.view()
     }
@@ -157,7 +157,7 @@ where
     }
 
     #[allow(unused)]
-    fn view(&self, store: &Store) -> ViewCmds {
+    fn view(&self, store: &Store) -> View {
         let view = &self.view;
         view.view(self.state_id.clone_weak(), store)
     }
@@ -165,28 +165,28 @@ where
 
 /// A callback that builds the descendants of a [`Widget`].
 pub trait ViewFn: 'static {
-    fn view(&self) -> ViewCmds;
+    fn view(&self) -> View;
 }
 
 impl<F> ViewFn for F
 where
-    F: Fn() -> ViewCmds + 'static,
+    F: Fn() -> View + 'static,
 {
-    fn view(&self) -> ViewCmds {
+    fn view(&self) -> View {
         self()
     }
 }
 
 /// A function that builds the descendants of a [`Widget`] with respect to some state.
 pub trait StateViewFn<S: State>: 'static {
-    fn view(&self, state_id: Id<S>, store: &Store) -> ViewCmds;
+    fn view(&self, state_id: Id<S>, store: &Store) -> View;
 }
 
 impl<S: State, F> StateViewFn<S> for F
 where
-    F: Fn(&S, &Store) -> ViewCmds + 'static,
+    F: Fn(&S, &Store) -> View + 'static,
 {
-    fn view(&self, state_id: Id<S>, store: &Store) -> ViewCmds {
+    fn view(&self, state_id: Id<S>, store: &Store) -> View {
         self(store.get(&state_id), store)
     }
 }

@@ -1,7 +1,7 @@
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{DynMessage, FontDB, Store, UntypedId, ViewCmds};
+use crate::{DynMessage, FontDB, Store, UntypedId, View};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -46,8 +46,8 @@ pub trait Widget: Downcast {
 
     /// Renders descendant [`Widget`]s.
     #[allow(unused)]
-    fn view(&self, store: &Store) -> ViewCmds {
-        ViewCmds::new()
+    fn view(&self, store: &Store) -> View {
+        View::new()
     }
 }
 

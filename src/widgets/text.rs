@@ -9,7 +9,7 @@ use crate::vello::glyph::Glyph;
 use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontDB, FontQuery, ToUiString, UiString, ViewCmds, Widget};
+use crate::{Class, FontDB, FontQuery, FontStyle, ToUiString, UiString, View, Widget};
 use crate::vello::Scene;
 
 /// A simple text [`Widget`](crate::Widget).
@@ -27,9 +27,47 @@ pub struct Text {
 }
 
 impl Text {
+
+    pub fn new(string: impl ToUiString) -> Self {
+        Self {
+            string: string.to_ui_string(),
+            ..Default::default()
+        }
+    }
+
     #[inline(always)]
-    pub fn insert(self, view: &mut ViewCmds) {
+    pub fn insert(self, view: &mut View) {
         view.insert(self);
+    }
+
+    pub fn font(mut self, font: FontQuery) -> Self {
+        self.font = font;
+        self
+    }
+
+    pub fn font_family(mut self, font_family: impl ToUiString) -> Self {
+        self.font.family = font_family.to_ui_string();
+        self
+    }
+
+    pub fn font_size(mut self, font_size: u32) -> Self {
+        self.font.size = font_size;
+        self
+    }
+
+    pub fn font_weight(mut self, font_weight: u32) -> Self {
+        self.font.weight = font_weight;
+        self
+    }
+
+    pub fn font_style(mut self, font_style: FontStyle) -> Self {
+        self.font.style = font_style;
+        self
+    }
+    
+    pub fn class(mut self, class: impl Class<Self>) -> Self {
+        class.apply(&mut self);
+        self
     }
 }
 
@@ -138,12 +176,6 @@ pub enum TextAlign {
     Left,
     Right,
     Center,
-}
-
-pub fn text(string: impl ToUiString, class: impl Class<Text>) -> Text {
-    let mut text = Text { string: string.to_ui_string(), ..Default::default() };
-    class.apply(&mut text);
-    text
 }
 
 fn to_font_ref(font: &Font) -> Option<FontRef<'_>> {

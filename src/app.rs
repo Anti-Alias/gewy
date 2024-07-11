@@ -5,7 +5,7 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId as WinitWindowId;
-use crate::{Div, FontDB, InputMessage, Store, ViewCmds, Window, WindowGraphics, WindowId, UI};
+use crate::{Div, FontDB, InputMessage, Store, View, Window, WindowGraphics, WindowId, UI};
 
 /// Application that displays a gewy UI in a single winit window.
 pub struct App {
@@ -162,7 +162,7 @@ impl AppCtx {
 
     pub fn create_window<F>(&mut self, width: u32, height: u32, view_fn: F) -> WindowId
     where
-        F: FnOnce(&mut Store) -> ViewCmds
+        F: FnOnce(&mut Store) -> View
     {
         // Builds root div
         let mut div = Div::default();

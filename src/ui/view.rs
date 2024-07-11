@@ -2,11 +2,11 @@ use smallvec::SmallVec;
 use crate::{WidgetId, Widget, UI};
 
 /// A list of instructions that will build a subtree of [`Widget`]s.
-pub struct ViewCmds {
+pub struct View {
     commands: SmallVec<[ViewCommand; 32]>,
     depth: u32,
 }
-impl ViewCmds {
+impl View {
 
     pub fn new() -> Self {
         Self {
@@ -66,9 +66,4 @@ enum ViewCommand {
     Insert(Box<dyn Widget>),
     Begin(Box<dyn Widget>),
     End,
-}
-
-#[inline(always)]
-pub fn end(v: &mut ViewCmds) {
-    v.end();
 }
