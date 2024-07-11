@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use taffy::Style;
-use crate::{root_style, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, View, Widget};
+use crate::{root_style, DynMessage, Id, Mapper, Message, State, Store, ToUiString, UiString, UntypedId, ViewCmds, Widget};
 
 
 /// An inline [`Widget`] not bound to any state.
@@ -56,9 +56,9 @@ impl<V: ViewFn> Widget for Wid<V> {
     }
 
     #[allow(unused)]
-    fn view(&self, _store: &Store, v: &mut View) {
+    fn view(&self, _store: &Store) -> ViewCmds {
         let view_fn = &self.view;
-        view_fn.view(v);
+        view_fn.view()
     }
 }
 
@@ -157,38 +157,37 @@ where
     }
 
     #[allow(unused)]
-    fn view(&self, store: &Store, v: &mut View) {
+    fn view(&self, store: &Store) -> ViewCmds {
         let view = &self.view;
-        view.view(self.state_id.clone_weak(), store, v);
+        view.view(self.state_id.clone_weak(), store)
     }
 }
 
 /// A callback that builds the descendants of a [`Widget`].
 pub trait ViewFn: 'static {
-    fn view(&self, view: &mut View);
+    fn view(&self) -> ViewCmds;
 }
 
 impl<F> ViewFn for F
 where
-    F: Fn(&mut View) + 'static,
+    F: Fn() -> ViewCmds + 'static,
 {
-    fn view(&self, view: &mut View) {
-        self(view)
+    fn view(&self) -> ViewCmds {
+        self()
     }
 }
 
 /// A function that builds the descendants of a [`Widget`] with respect to some state.
 pub trait StateViewFn<S: State>: 'static {
-    fn view(&self, state_id: Id<S>, store: &Store, view: &mut View);
+    fn view(&self, state_id: Id<S>, store: &Store) -> ViewCmds;
 }
 
 impl<S: State, F> StateViewFn<S> for F
 where
-    F: Fn(ViewParams<S>) + 'static,
+    F: Fn(&S, &Store) -> ViewCmds + 'static,
 {
-    fn view(&self, state_id: Id<S>, store: &Store, view: &mut View) {
-        let params = ViewParams { state_id, store, view };
-        self(params)
+    fn view(&self, state_id: Id<S>, store: &Store) -> ViewCmds {
+        self(store.get(&state_id), store)
     }
 }
 
@@ -212,25 +211,6 @@ where
         self(params)
     }
 }
-
-
-/// Parameters sent to a [`StateViewFn`].
-pub struct ViewParams<'a, 'b, S: State> {
-    pub state_id: Id<S>,
-    pub store: &'a Store,
-    pub view: &'a mut View<'b>,
-}
-
-impl<'a, 'b, S: State> ViewParams<'a, 'b, S> {
-    pub fn state(&self) -> &S {
-        self.store.get(&self.state_id)
-    }
-    pub fn state_view(&mut self) -> (&S, &mut View<'b>) {
-        let state = self.store.get(&self.state_id);
-        (state, self.view)
-    }
-}
-
 
 
 /// Parameters sent to an [`UpdateFn`].

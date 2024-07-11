@@ -1,6 +1,6 @@
 use taffy::FlexDirection;
 
-use crate::{Class, View, Widget, WidgetId};
+use crate::{Class, ViewCmds, Widget};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -16,15 +16,13 @@ pub struct Div {
 impl Div {
 
     #[inline(always)]
-    pub fn ins(self, v: &mut View) -> WidgetId<Self> {
-        v.insert(self)
+    pub fn ins(self, view: &mut ViewCmds) {
+        view.insert(self);
     }
 
     #[inline(always)]
-    pub fn beg(self, v: &mut View) -> WidgetId<Self> {
-        let id = v.insert(self);
-        v.begin();
-        id
+    pub fn begin(self, view: &mut ViewCmds) {
+        view.begin(self);
     }
 }
 

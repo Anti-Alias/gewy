@@ -9,16 +9,19 @@ fn main() {
 }
 
 // View function
-fn root(_store: &mut Store, v: &mut View) {
-    col(cls::root).beg(v);
+fn root(_store: &mut Store) -> ViewCmds {
+    let mut view = ViewCmds::new();
+    let v = &mut view;
+    col(cls::root).begin(v);
         div(cls::red).ins(v);
-        col(cls::gray).beg(v);
+        col(cls::gray).begin(v);
             div(cls::green).ins(v);
-            text("This is some text!", cls::text).ins(v);
+            text("This is some text!", cls::text).insert(v);
             div(cls::yellow).ins(v);
         end(v);
         div(cls::blue).ins(v);
     end(v);
+    view
 }
 
 

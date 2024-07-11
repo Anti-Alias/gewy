@@ -1,4 +1,4 @@
-use crate::{Class, DynMapper, DynMessage, InputMessage, Mapper, MouseButton, Store, View, Widget, WidgetId};
+use crate::{Class, DynMapper, DynMessage, InputMessage, Mapper, MouseButton, Store, ViewCmds, Widget};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -14,14 +14,13 @@ pub struct Button {
 
 impl Button {
     #[inline(always)]
-    pub fn ins(self, view: &mut View) -> WidgetId<Self> {
-        view.insert(self)
+    pub fn insert(self, view: &mut ViewCmds) {
+        view.insert(self);
     }
 
-    pub fn beg(self, view: &mut View) -> WidgetId<Self> {
-        let id = view.insert(self);
-        view.begin();
-        id
+    #[inline(always)]
+    pub fn begin(self, view: &mut ViewCmds) {
+        view.begin(self);
     }
 
     pub fn map(mut self, mapper: impl Mapper) -> Self {

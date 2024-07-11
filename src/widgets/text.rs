@@ -9,7 +9,7 @@ use crate::vello::glyph::Glyph;
 use crate::vello::kurbo::{Rect, Vec2};
 use crate::vello::peniko::{Brush, Fill};
 
-use crate::{Class, FontDB, FontQuery, ToUiString, UiString, View, Widget, WidgetId};
+use crate::{Class, FontDB, FontQuery, ToUiString, UiString, ViewCmds, Widget};
 use crate::vello::Scene;
 
 /// A simple text [`Widget`](crate::Widget).
@@ -28,8 +28,8 @@ pub struct Text {
 
 impl Text {
     #[inline(always)]
-    pub fn ins(self, view: &mut View) -> WidgetId<Self> {
-        view.insert(self)
+    pub fn insert(self, view: &mut ViewCmds) {
+        view.insert(self);
     }
 }
 

@@ -16,14 +16,17 @@ fn start(ctx: &mut AppCtx) {
     ctx.create_window(512, 512, view);
 }
 
-fn view(store: &mut Store, v: &mut View) {
+fn view(store: &mut Store) -> ViewCmds {
     let state = store.init::<CounterState>();
-    col(cls::center).beg(v);
-        div(cls::title_box).beg(v);
-            text("Counter Example!", cls::nop).ins(v);
+    let mut view = ViewCmds::new();
+    let v = &mut view;
+    col(cls::center).begin(v);
+        div(cls::title_box).begin(v);
+            text("Counter Example!", cls::nop).insert(v);
         end(v);
         counter(state, (), v);
     end(v);
+    view
 }
 
 
