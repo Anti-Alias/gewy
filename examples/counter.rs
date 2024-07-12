@@ -13,19 +13,17 @@ fn main() {
 }
 
 fn start(ctx: &mut AppCtx) {
-    ctx.create_window(512, 512, view);
+    let state = ctx.store.init::<CounterState>();
+    ctx.create_window(512, 512, move |v| ui(state, v));
 }
 
-fn view(store: &mut Store) -> View {
-    let state = store.init::<CounterState>();
-    let mut v = View::new();
-    Col::new().class(center).begin(&mut v);
-        Div::new().class(title_box).begin(&mut v);
-            Text::new("Counter Example!").insert(&mut v);
-        Div::end(&mut v);
-        counter(state, (), &mut v);
-    Col::end(&mut v);
-    v
+fn ui(state: Id<CounterState>, v: &mut View) {
+    Col::new().class(center).begin(v);
+        Div::new().class(title_box).begin(v);
+            Text::new("Counter Example!").insert(v);
+        Div::end(v);
+        Counter::new(state).insert(v);
+    Col::end(v);
 }
 
 fn center(d: &mut Div) {

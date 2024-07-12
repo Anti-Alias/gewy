@@ -8,18 +8,16 @@ fn main() {
         .start();
 }
 
-fn ui(_store: &mut Store) -> View {
-    let mut v = View::new();
-    Col::new().class(root).begin(&mut v);
-        Div::new().class(red).insert(&mut v);
-        Col::new().class(gray).begin(&mut v);
-            Div::new().class(green).insert(&mut v);
-            Text::new("This is some text!").class(text).insert(&mut v);
-            Div::new().class(yellow).insert(&mut v);
-        Col::end(&mut v);
-        Div::new().class(blue).insert(&mut v);
-    Col::end(&mut v);
-    v
+fn ui(v: &mut View) {
+    Col::new().class(root).begin(v);
+        Div::new().class(red).insert(v);
+        Col::new().class(gray).begin(v);
+            Div::new().class(green).insert(v);
+            Text::new("This is some text!").class(text).insert(v);
+            Div::new().class(yellow).insert(v);
+        Col::end(v);
+        Div::new().class(blue).insert(v);
+    Col::end(v);
 }
 
 

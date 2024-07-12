@@ -162,7 +162,7 @@ impl AppCtx {
 
     pub fn create_window<F>(&mut self, width: u32, height: u32, view_fn: F) -> WindowId
     where
-        F: FnOnce(&mut Store) -> View
+        F: FnOnce(&mut View)
     {
         // Builds root div
         let mut div = Div::default();
@@ -174,7 +174,8 @@ impl AppCtx {
         // Builds initial UI
         let mut ui = UI::new(div);
         let ui_root = ui.root_id();
-        let view_commands = view_fn(&mut self.store);
+        let mut view_commands = View::new();
+        view_fn(&mut view_commands);
         view_commands.execute(ui_root, &mut ui);
         ui.init(ui_root, &self.fonts);
 

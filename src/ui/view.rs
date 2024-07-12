@@ -1,5 +1,5 @@
 use smallvec::SmallVec;
-use crate::{WidgetId, Widget, UI};
+use crate::{Comp, Component, Widget, WidgetId, UI};
 
 /// A list of instructions that will build a subtree of [`Widget`]s.
 pub struct View {
@@ -18,6 +18,13 @@ impl View {
     /// Inserts a [`Widget`] as the child of the current [`Widget`].
     #[inline(always)]
     pub fn insert(&mut self, widget: impl Widget) {
+        let command = ViewCommand::Insert(Box::new(widget));
+        self.commands.push(command);
+    }
+
+    /// Inserts a [`Component`].
+    pub fn insert_component<C: Component>(&mut self, component: C) {
+        let widget = Comp(component);
         let command = ViewCommand::Insert(Box::new(widget));
         self.commands.push(command);
     }

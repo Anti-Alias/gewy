@@ -1,7 +1,7 @@
 use vello::Scene;
 use downcast_rs::{Downcast, impl_downcast};
 
-use crate::{DynMessage, FontDB, Store, UntypedId, View};
+use crate::{FontDB, Msg, Store, UntypedId, View};
 use crate::taffy::{Style, Layout, Size, AvailableSpace};
 use crate::kurbo::Affine;
 
@@ -35,7 +35,7 @@ pub trait Widget: Downcast {
     fn init(&mut self, fonts: &FontDB) {}
 
     #[allow(unused)]
-    fn update(&self, store: &mut Store, message: DynMessage) -> Option<DynMessage> {
+    fn update<'a>(&'a self, store: &mut Store, message: Msg<'a>) -> Option<Msg<'a>> {
         Some(message)
     }
 
@@ -46,9 +46,7 @@ pub trait Widget: Downcast {
 
     /// Renders descendant [`Widget`]s.
     #[allow(unused)]
-    fn view(&self, store: &Store) -> View {
-        View::new()
-    }
+    fn view(&self, store: &Store, view: &mut View) {}
 }
 
 impl_downcast!(Widget);

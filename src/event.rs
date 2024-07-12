@@ -1,5 +1,7 @@
 use winit::event::{ElementState, MouseButton as WinitMouseButton};
 
+use crate::MessageType;
+
 /// All events with regards to input.
 #[derive(Clone)]
 pub enum InputMessage {
@@ -9,6 +11,7 @@ pub enum InputMessage {
     CursorLeft,
     CursorMoved { x: f32, y: f32 },
 }
+impl MessageType for InputMessage {}
 
 impl InputMessage {
 

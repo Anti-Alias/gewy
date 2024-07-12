@@ -25,22 +25,44 @@ impl Store {
     }
 
     pub fn get<S: State>(&self, id: &Id<S>) -> &S {
-        let data = self.states.get(id.raw()).unwrap();
-        data.state.downcast_ref().unwrap()
+        let obj = self.states.get(id.raw()).unwrap();
+        match &obj.slot {
+            Slot::Occupied(state) => state.downcast_ref().unwrap(),
+            Slot::Empty => panic!("Slot not occupied"),
+        }
     }
 
     pub fn get_mut<S: State>(&mut self, id: &Id<S>) -> &mut S {
+        let obj = self.states.get_mut(id.raw()).unwrap();
+        match &mut obj.slot {
+            Slot::Occupied(state) => state.downcast_mut().unwrap(),
+            Slot::Empty => panic!("Slot not occupied"),
+        }
+    }
+
+    pub(crate) fn remove<S: State>(&mut self, id: &Id<S>) -> S {
         self.updated_states.push(id.raw());
-        let state_data = self.states.get_mut(id.raw()).unwrap();
-        state_data.state.downcast_mut().unwrap()
+        let obj = self.states.get_mut(id.raw()).unwrap();
+        let slot = std::mem::replace(&mut obj.slot, Slot::Empty);
+        let value = match slot {
+            Slot::Occupied(value) => value,
+            Slot::Empty => panic!("Empty slot"),
+        };
+        let value: Box<S> = match value.downcast() {
+            Ok(value) => value,
+            Err(_) => panic!("Failed to downcast"),
+        };
+        *value
+    }
+
+    pub(crate) fn restore<S: State>(&mut self, id: &Id<S>, state: S) {
+        let obj = self.states.get_mut(id.raw()).unwrap();
+        obj.slot = Slot::Occupied(Box::new(state));
     }
 
     /// Creates a [`State`] with an initial value.
     pub fn create<S: State>(&mut self, state: S) -> Id<S> {
-        let raw_id = self.states.insert(StateObject {
-            ref_count: 1,
-            state: Box::new(state),
-        });
+        let raw_id = self.states.insert(StateObject::new(state));
         Id::new(raw_id, self.sender.clone())
     }
 
@@ -101,5 +123,19 @@ pub enum StateEvent {
 /// A reference-counted state object.
 struct StateObject {
     ref_count: u32,
-    state: Box<dyn State>,
+    slot: Slot,
+}
+
+impl StateObject {
+    fn new(state: impl State) -> Self {
+        Self {
+            ref_count: 1,
+            slot: Slot::Occupied(Box::new(state)),
+        }
+    }
+}
+
+pub enum Slot {
+    Occupied(Box<dyn State>),
+    Empty,
 }

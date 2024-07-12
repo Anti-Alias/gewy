@@ -1,4 +1,4 @@
-use crate::{Class, DynMessage, InputMessage, Message, MouseButton, Store, Text, ToUiString, View, Widget};
+use crate::{Class, InputMessage, Message, MessageType, MouseButton, Msg, Store, Text, ToUiString, View, Widget};
 use crate::vello::Scene;
 use crate::taffy::{Style, Layout};
 use crate::peniko::{Color, Fill};
@@ -9,8 +9,8 @@ pub struct Button {
     pub style: Style,
     pub color: Color,
     pub radii: RoundedRectRadii,
-    pub press: Option<DynMessage>,
-    pub release: Option<DynMessage>,
+    pub press: Option<Message>,
+    pub release: Option<Message>,
 }
 
 impl Button {
@@ -40,13 +40,13 @@ impl Button {
         self
     }
 
-    pub fn press(mut self, press: impl Message) -> Self {
-        self.press = Some(DynMessage::new(press));
+    pub fn press(mut self, press: impl MessageType) -> Self {
+        self.press = Some(press.into());
         self
     }
 
-    pub fn release(mut self, release: impl Message) -> Self {
-        self.release = Some(DynMessage::new(release));
+    pub fn release(mut self, release: impl MessageType) -> Self {
+        self.release = Some(release.into());
         self
     }
 }
@@ -74,13 +74,13 @@ impl Widget for Button {
         scene.fill(Fill::NonZero, affine, self.color, None, &rect);
     }
 
-    fn update(&self, _store: &mut Store, message: DynMessage) -> Option<DynMessage> {
+    fn update<'a>(&'a self, _store: &mut Store, message: Msg<'a>) -> Option<Msg<'a>> {
         let Some(input) = message.downcast_ref::<InputMessage>() else {
             return Some(message);
         };
         match input {
-            InputMessage::MousePressed { button: MouseButton::Left } => self.press.clone(),
-            InputMessage::MouseReleased { button: MouseButton::Left } => self.release.clone(),
+            InputMessage::MousePressed { button: MouseButton::Left } => self.press.as_deref(),
+            InputMessage::MouseReleased { button: MouseButton::Left } => self.release.as_deref(),
             _ => None
         }
     }
@@ -106,13 +106,13 @@ impl TextButton {
         self
     }
 
-    pub fn press(mut self, press: impl Message) -> Self {
-        self.button.press = Some(DynMessage::new(press));
+    pub fn press(mut self, press: impl MessageType) -> Self {
+        self.button.press = Some(press.into());
         self
     }
 
-    pub fn release(mut self, release: impl Message) -> Self {
-        self.button.release = Some(DynMessage::new(release));
+    pub fn release(mut self, release: impl MessageType) -> Self {
+        self.button.release = Some(release.into());
         self
     }
 

@@ -1,86 +1,44 @@
-use dyn_clone::DynClone;
-use downcast_rs::{Downcast, impl_downcast};
+use std::any::Any;
+use std::ops::{Deref, DerefMut};
+use downcast_rs::{impl_downcast, Downcast};
+
 
 /// A message emitted by either a [`Widget`](crate::Widget) or a [`State`](crate::State).
-pub trait Message: Downcast + DynClone + 'static {}
-impl<T: Downcast + DynClone + 'static> Message for T {}
-impl_downcast!(Message);
-dyn_clone::clone_trait_object!(Message);
+pub trait MessageType: Any + Downcast {}
+impl_downcast!(MessageType);
 
 
-/// Dynamic form of a [`Message`].
-#[derive(Clone)]
-pub struct DynMessage(Box<dyn Message>);
+/// A message sent to a [`Widget`](crate::Widget) for it to handle.
+pub struct Message(Box<dyn MessageType>);
 
-impl DynMessage {
-    pub fn new(msg: impl Message) -> Self {
-        Self(Box::new(msg))
+impl<M: MessageType> From<M> for Message {
+    fn from(message: M) -> Self {
+        Self(Box::new(message))
     }
-    pub fn as_ref(&self) -> &dyn Message {
+}
+
+impl Deref for Message {
+    type Target = dyn MessageType;
+    fn deref(&self) -> &Self::Target {
         self.0.as_ref()
     }
-    pub fn downcast_ref<M: Message>(&self) -> Option<&M> {
+}
+
+impl DerefMut for Message {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut()
+    }
+}
+
+impl Message {
+
+    pub fn as_ref(&self) -> Msg<'_> {
+        self.0.as_ref()
+    }
+    pub fn downcast_ref<M: MessageType>(&self) -> Option<&M> {
         self.0.downcast_ref()
     }
 }
 
-
-/// Maps an input message to an output message.
-pub trait Mapper: 'static {
-    fn map(&self, msg: &dyn Message) -> Option<DynMessage>;
-}
-
-impl Mapper for () {
-    fn map(&self, _msg: &dyn Message) -> Option<DynMessage> { None }
-}
-
-impl<I, O> Mapper for (I, O)
-where
-    I: Message + PartialEq,
-    O: Message + Clone,
-{
-    fn map(&self, message: &dyn Message) -> Option<DynMessage> {
-        let Some(input) = message.downcast_ref::<I>() else { return None };
-        if input == &self.0 {
-            let output = DynMessage::new(self.1.clone());
-            Some(output)
-        }
-        else {
-            None
-        }
-    }
-}
-
-impl<M: Mapper, const N: usize> Mapper for [M; N] {
-    fn map(&self, input: &dyn Message) -> Option<DynMessage> {
-        for mapper in self {
-            if let Some(output) = mapper.map(input) {
-                return Some(output);
-            }
-        }
-        None
-    }
-}
-
-
-/// Dynamic form of [`Mapper`].
-pub struct DynMapper(Box<dyn Mapper>);
-
-impl DynMapper {
-    #[inline(always)]
-    pub fn map(&self, input: &dyn Message) -> Option<DynMessage> {
-        self.0.map(input)
-    }
-}
-
-impl<M: Mapper> From<M> for DynMapper {
-    fn from(mapper: M) -> Self {
-        Self(Box::new(mapper))
-    }
-}
-
-impl Default for DynMapper {
-    fn default() -> Self {
-        Self(Box::new(()))
-    }
-}
+/// A borrowed [Message].
+pub type Msg<'a> = &'a dyn MessageType;

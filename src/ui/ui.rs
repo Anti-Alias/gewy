@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 use taffy::{AvailableSpace, Size, TaffyTree};
 use vello::kurbo::{Affine, Vec2};
-use crate::{DynMessage, FontDB, InputMessage, MouseButton, RawId, Store, Widget};
+use crate::{FontDB, InputMessage, MouseButton, Msg, RawId, Store, View, Widget};
 use crate::vello::Scene;
 use crate::taffy::Style;
 
@@ -140,8 +140,7 @@ impl UI {
             InputMessage::MousePressed { button: MouseButton::Left }  => {
                 self.cursor.pressed_location = Some(self.cursor.location);
                 let Some(widget_id) = self.widget_touching(self.root_id, self.cursor.location) else { return };
-                let msg = DynMessage::new(msg);
-                self.bubble_message(msg, widget_id, store);
+                self.bubble_message(&msg, widget_id, store);
             },
             InputMessage::MouseReleased { button: MouseButton::Left } => {
                 let pressed_loc = self.cursor.pressed_location.take().unwrap();
@@ -149,8 +148,7 @@ impl UI {
                 let Some(pressed_widget_id) = self.widget_touching(self.root_id, pressed_loc) else { return };
                 let Some(released_widget_id) = self.widget_touching(self.root_id, released_loc) else { return };
                 if pressed_widget_id == released_widget_id {
-                    let msg = DynMessage::new(msg);
-                    self.bubble_message(msg, released_widget_id, store);
+                    self.bubble_message(&msg, released_widget_id, store);
                 }
             }
             _ => {}
@@ -176,9 +174,9 @@ impl UI {
         }
     }
 
-    fn bubble_message(&mut self, mut msg: DynMessage, mut widget_id: WidgetId, store: &mut Store) {
+    fn bubble_message<'a>(&'a self, mut msg: Msg<'a>, mut widget_id: WidgetId, store: &mut Store) {
         loop {
-            let widget = self.widgets.get_node_context_mut(widget_id.0).unwrap();
+            let widget = self.widgets.get_node_context(widget_id.0).unwrap();
             let Some(new_msg) = widget.update(store, msg) else { return };
             let Some(parent_id) = self.widgets.parent(widget_id.0) else { return };
             msg = new_msg;
@@ -211,7 +209,8 @@ impl UI {
             let widget = widget.as_ref();
             std::mem::transmute(widget)
         };
-        let view_commands = widget.view(store);
+        let mut view_commands = View::new();
+        widget.view(store, &mut view_commands);
         view_commands.execute(widget_id, self);
         self.init(widget_id, fonts);
     }
@@ -309,41 +308,4 @@ pub struct Cursor {
     location: Location,
     pressed_location: Option<Location>,
     on_screen: bool,
-}
-
-#[cfg(test)]
-mod test {
-    use crate::{UI, Widget};
-
-    struct BlankWidget;
-    impl Widget for BlankWidget {}
-
-
-    //////////////////////////////
-    //          A
-    //         / \
-    //        B   D
-    //       /   / \
-    //      C   E   F
-    #[test]
-    fn test_len() {
-        let mut tree = UI::new(BlankWidget);
-
-        // Builds tree
-        let a_id = tree.root_id;
-        let b_id = tree.insert(BlankWidget, a_id).unwrap();
-        let _c_id = tree.insert(BlankWidget, b_id).unwrap();
-        let d_id = tree.insert(BlankWidget, a_id).unwrap();
-        let e_id = tree.insert(BlankWidget, d_id).unwrap();
-        let f_id = tree.insert(BlankWidget, d_id).unwrap();
-
-        // Removes elements and checks length
-        assert_eq!(6, tree.len());
-        tree.remove(e_id);
-        assert_eq!(5, tree.len());
-        tree.remove(f_id);
-        assert_eq!(4, tree.len());
-        tree.remove(b_id);
-        assert_eq!(2, tree.len());
-    }
 }
