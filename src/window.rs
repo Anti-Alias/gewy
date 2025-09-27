@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use winit::{event_loop::ActiveEventLoop, window::{Window as WinitWindow, WindowAttributes}};
+use winit::{event_loop::{ActiveEventLoop, EventLoopProxy}, window::{Window as WinitWindow, WindowAttributes}};
 use pollster::FutureExt;
 use wgpu::*;
-use crate::WindowId;
+use crate::{AppEvent, WindowId};
 
 pub struct Window {
     window: Arc<WinitWindow>,
@@ -12,6 +12,7 @@ pub struct Window {
     surface_config: SurfaceConfiguration,
     device: Device,
     queue: Queue,
+    proxy: EventLoopProxy<AppEvent>,
 }
 
 impl Window {
@@ -20,6 +21,7 @@ impl Window {
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
         instance: &Instance,
+        proxy: EventLoopProxy<AppEvent>,
     ) -> Self {
         let window = event_loop.create_window(window_attributes.clone()).unwrap();
         let window = Arc::new(window);
@@ -31,7 +33,7 @@ impl Window {
             .block_on()
             .unwrap();
         surface.configure(&device, &surface_config);
-        Self { window, window_attributes, surface, surface_config, device, queue }
+        Self { window, window_attributes, surface, surface_config, device, queue, proxy }
     }
 
     pub(crate) fn resize(&mut self, width: u32, height: u32) {
@@ -42,7 +44,7 @@ impl Window {
 
     pub(crate) fn recreate(&mut self, event_loop: &ActiveEventLoop, instance: &Instance) {
         let window_attributes = self.window_attributes.clone();
-        *self = Self::new(event_loop, window_attributes, instance);
+        *self = Self::new(event_loop, window_attributes, instance, self.proxy.clone());
     }
 
     pub(crate) fn redraw(&mut self) {

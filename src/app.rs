@@ -1,7 +1,7 @@
 use wgpu::{Backends, Instance, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use crate::{Window, WindowAttributes, WindowId};
 
 /// Trait representing an application.
@@ -19,7 +19,8 @@ pub trait App {
 /// Runs the application, blocking until the application quits.
 pub fn run_app(app: impl App) {
     let event_loop = EventLoop::<AppEvent>::with_user_event().build().unwrap();
-    let mut handler = AppHandler::new(app);
+    let proxy = event_loop.create_proxy();
+    let mut handler = AppHandler::new(app, proxy);
     event_loop.run_app(&mut handler).unwrap();
 }
 
@@ -29,6 +30,7 @@ struct AppHandler<A: App> {
     instance: Instance,
     started: bool,
     windows: Vec<Window>,
+    proxy: EventLoopProxy<AppEvent>,
 }
 impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
 
@@ -36,7 +38,8 @@ impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
         let mut ctx = AppCtx {
             event_loop,
             instance: &self.instance,
-            windows: &mut self.windows
+            windows: &mut self.windows,
+            proxy: &self.proxy,
         };
         if !self.started {
             self.app.start(ctx);
@@ -86,7 +89,8 @@ impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
         let ctx = AppCtx {
             event_loop,
             instance: &self.instance,
-            windows: &mut self.windows
+            windows: &mut self.windows,
+            proxy: &self.proxy,
         };
         self.app.exit(ctx);    
     }
@@ -94,9 +98,10 @@ impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
 }
 
 impl<A: App> AppHandler<A> {
-    fn new(app: A) -> Self {
+    fn new(app: A, proxy: EventLoopProxy<AppEvent>) -> Self {
         Self {
             app,
+            proxy,
             started: false,
             windows: vec![],
             instance: Instance::new(&InstanceDescriptor {
@@ -110,6 +115,7 @@ impl<A: App> AppHandler<A> {
 /// Object that allows for talking to the application runtime.
 pub struct AppCtx<'a> {
     event_loop: &'a ActiveEventLoop,
+    proxy: &'a EventLoopProxy<AppEvent>,
     instance: &'a Instance,
     windows: &'a mut Vec<Window>,
 }
@@ -118,7 +124,7 @@ impl<'a> AppCtx<'a> {
 
     /// Creates a new window.
     pub fn create_window(&mut self, attributes: WindowAttributes) -> WindowId {
-        let window = Window::new(self.event_loop, attributes, self.instance);
+        let window = Window::new(self.event_loop, attributes, self.instance, self.proxy.clone());
         let window_id = window.id();
         self.windows.push(window);
         window_id
