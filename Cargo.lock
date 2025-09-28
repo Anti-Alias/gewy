@@ -556,6 +556,7 @@ dependencies = [
  "env_logger",
  "log",
  "pollster",
+ "smallvec",
  "wgpu",
  "winit",
 ]

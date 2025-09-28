@@ -157,6 +157,4 @@ impl<'a> AppCtx<'a> {
 
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum AppEvent {
-    Exit,
-}
+pub enum AppEvent { Exit }
