@@ -1,7 +1,7 @@
 use gewy::{App, AppCtx, LogicalSize, WindowAttributes, run_app};
 
-struct Handler;
-impl App for Handler {
+struct MyApp;
+impl App for MyApp {
     fn start(&mut self, mut ctx: AppCtx) {
         log::info!("Started!!!");
         let attr = WindowAttributes::default()
@@ -17,5 +17,5 @@ impl App for Handler {
 
 fn main() {
     env_logger::init();
-    run_app(Handler);
+    run_app(MyApp);
 }

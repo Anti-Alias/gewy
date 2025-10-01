@@ -1,17 +1,23 @@
-use std::sync::Arc;
-
-use winit::{event_loop::{ActiveEventLoop, EventLoopProxy}, window::{Window as WinitWindow, WindowAttributes}};
-use pollster::FutureExt;
-use wgpu::*;
 use crate::{AppEvent, WindowId};
+use pollster::FutureExt;
+use std::sync::Arc;
+use vello::kurbo::Affine;
+use vello::util::{RenderContext, RenderSurface};
+use vello::{Renderer, RendererOptions, Scene};
+use wgpu::{PresentMode, TextureViewDescriptor};
+use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
+use winit::window::{Window as WinitWindow, WindowAttributes};
+
+const CLEAR_COLOR: vello::peniko::Color = vello::peniko::Color::from_rgba8(100, 100, 100, 255);
 
 pub struct Window {
+    // Vello
+    renderer: Renderer,
+    surface: RenderSurface<'static>,
+    scene: Scene,
+    // Winit
     window: Arc<WinitWindow>,
     window_attributes: WindowAttributes,
-    surface: Surface<'static>,
-    surface_config: SurfaceConfiguration,
-    device: Device,
-    queue: Queue,
     proxy: EventLoopProxy<AppEvent>,
 }
 
@@ -20,58 +26,88 @@ impl Window {
     pub(crate) fn new(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        instance: &Instance,
+        context: &mut RenderContext,
         proxy: EventLoopProxy<AppEvent>,
     ) -> Self {
         let window = event_loop.create_window(window_attributes.clone()).unwrap();
         let window = Arc::new(window);
-        let surface = instance.create_surface(window.clone()).unwrap();
-        let adapter = select_adapter(instance, &surface);
-        let surface_config = create_surface_config(&surface, &adapter, window.inner_size().width, window.inner_size().height);
-        let (device, queue) = adapter 
-            .request_device(&DeviceDescriptor::default())
+        let surface = context
+            .create_surface(
+                window.clone(),
+                window.inner_size().width,
+                window.inner_size().height,
+                PresentMode::Fifo,
+            )
             .block_on()
             .unwrap();
-        surface.configure(&device, &surface_config);
-        Self { window, window_attributes, surface, surface_config, device, queue, proxy }
-    }
-
-    pub(crate) fn resize(&mut self, width: u32, height: u32) {
-        self.surface_config.width = width.max(1);
-        self.surface_config.height = height.max(1);
-        self.surface.configure(&self.device, &self.surface_config);
-    }
-
-    pub(crate) fn recreate(&mut self, event_loop: &ActiveEventLoop, instance: &Instance) {
-        let window_attributes = self.window_attributes.clone();
-        *self = Self::new(event_loop, window_attributes, instance, self.proxy.clone());
-    }
-
-    pub(crate) fn redraw(&mut self) {
-        let encoder_desc = CommandEncoderDescriptor { label: Some("Window Encoder") };
-        let Ok(surface_texture) = self.surface.get_current_texture() else { return };
-        let view = surface_texture.texture.create_view(&TextureViewDescriptor::default());
-        let mut encoder = self.device.create_command_encoder(&encoder_desc);
-        {
-            let _render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Window Render Pass"),
-                color_attachments: &[
-                    Some(RenderPassColorAttachment {
-                        view: &view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: Operations {
-                            load: LoadOp::Clear(CLEAR_COLOR),
-                            store: StoreOp::Discard,
-                        },
-                    })
-                ],
-                ..Default::default()
-            });
+        let device = &context.devices[surface.dev_id].device;
+        let renderer = Renderer::new(device, RendererOptions::default()).unwrap();
+        Self {
+            window,
+            window_attributes,
+            renderer,
+            proxy,
+            surface,
+            scene: Scene::new(),
         }
-        let command_buffers = std::iter::once(encoder.finish());
-        self.queue.submit(command_buffers);
-        surface_texture.present();
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32, context: &RenderContext) {
+        let width = width.max(1);
+        let height = height.max(1);
+        context.resize_surface(&mut self.surface, width, height);
+    }
+
+    pub(crate) fn recreate(&mut self, event_loop: &ActiveEventLoop, context: &mut RenderContext) {
+        let window_attributes = self.window_attributes.clone();
+        *self = Self::new(event_loop, window_attributes, context, self.proxy.clone());
+    }
+
+    pub(crate) fn redraw(&mut self, context: &RenderContext) {
+        
+        // Paints vello scene
+        self.scene.reset();
+        self.scene.fill(
+            vello::peniko::Fill::NonZero,
+            Affine::IDENTITY,
+            vello::peniko::Color::from_rgb8(242, 140, 168),
+            None,
+            &vello::kurbo::Circle::new((420.0, 200.0), 120.0),
+        );
+
+        // Renders to offscreen texture provided by surface 
+        let device_handle = &context.devices[self.surface.dev_id];
+        self.renderer.render_to_texture(
+            &device_handle.device,
+            &device_handle.queue,
+            &self.scene,
+            &self.surface.target_view,
+            &vello::RenderParams {
+                base_color: CLEAR_COLOR,
+                width: self.surface.config.width,
+                height: self.surface.config.height,
+                antialiasing_method: vello::AaConfig::Msaa16,
+            },
+        )
+        .unwrap();
+
+        // Takes main surface texture off the "swap chain"
+        let surface_tex = self.surface.surface.get_current_texture().unwrap();
+        let surface_tex_view = surface_tex.texture.create_view(&TextureViewDescriptor::default());
+
+        // Blits offscreen texture onto the surface texture
+        let encoder_desc = &wgpu::CommandEncoderDescriptor { label: Some("Surface Blit") };
+        let mut encoder = device_handle.device.create_command_encoder(encoder_desc);
+        self.surface.blitter.copy(
+            &device_handle.device,
+            &mut encoder,
+            &self.surface.target_view,
+            &surface_tex_view,
+        );
+        device_handle.queue.submit([encoder.finish()]);
+
+        // Returns surface back to "swap chain"
+        surface_tex.present();
     }
 
     pub fn id(&self) -> WindowId {
@@ -79,9 +115,9 @@ impl Window {
     }
 }
 
-fn select_adapter(instance: &Instance, surface: &Surface) -> Adapter {
+fn select_adapter(instance: &wgpu::Instance, surface: &wgpu::Surface) -> wgpu::Adapter {
     instance
-        .request_adapter(&RequestAdapterOptions {
+        .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
             compatible_surface: Some(surface),
             force_fallback_adapter: false,
@@ -89,28 +125,3 @@ fn select_adapter(instance: &Instance, surface: &Surface) -> Adapter {
         .block_on()
         .unwrap()
 }
-
-fn create_surface_config(
-    surface: &Surface,
-    adapter: &Adapter,
-    width: u32,
-    height: u32,
-) -> SurfaceConfiguration {
-    let surface_caps = surface.get_capabilities(&adapter);
-    let surface_format = surface_caps.formats.iter()
-        .find(|f| f.is_srgb())
-        .copied()
-        .unwrap_or(surface_caps.formats[0]);
-    SurfaceConfiguration {
-        width,
-        height,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: surface_format,
-        present_mode: surface_caps.present_modes[0],
-        alpha_mode: surface_caps.alpha_modes[0],
-        view_formats: vec![],
-        desired_maximum_frame_latency: 2,
-    }
-}
-
-const CLEAR_COLOR: Color = Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 };
