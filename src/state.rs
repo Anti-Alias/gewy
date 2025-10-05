@@ -1,102 +1,161 @@
-use std::{any::Any, collections::HashMap};
-use smallvec::{smallvec, SmallVec};
+pub use derive::*;
+use std::any::Any;
 
-/// Storage of state objects.
-pub(crate) struct StateManager {
-    states: HashMap<StateId, StateCell>,
+pub type StatePath<'a> = &'a [&'a str];
+
+pub trait State: Any {
+    fn state<'a>(&'a self, _name: &str) -> Option<&'a dyn State> {
+        None
+    }
+    fn state_mut<'a>(&'a mut self, _name: &str) -> Option<&'a mut dyn State> {
+        None
+    }
+    fn as_any_ref(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
+pub(crate) fn query_state<'s, T: State>(
+    mut state: &'s dyn State,
+    mut path: StatePath,
+) -> Option<&'s T> {
+    loop {
+        let Some((id, remainder)) = path.split_first() else {
+            break;
+        };
+        let Some(sub_state) = state.state(id) else {
+            return None;
+        };
+        state = sub_state;
+        path = remainder;
+    }
+    let state = state.as_any_ref().downcast_ref::<T>()?;
+    Some(state)
+}
 
-impl StateManager {
+pub(crate) fn query_state_mut<'s, T: State>(
+    mut state: &'s mut dyn State,
+    mut path: StatePath,
+) -> Option<&'s T> {
+    loop {
+        let Some((id, remainder)) = path.split_first() else {
+            break;
+        };
+        let Some(sub_state) = state.state_mut(id) else {
+            return None;
+        };
+        state = sub_state;
+        path = remainder;
+    }
+    let state = state.as_any_mut().downcast_mut::<T>()?;
+    Some(state)
+}
 
-    pub fn new() -> Self {
-        Self {
-            states: HashMap::new(),
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[derive(Eq, PartialEq, Debug)]
+    struct Parent {
+        value: u32,
+        child1: Child,
+        child2: Child,
+    }
+
+    impl State for Parent {
+        fn state<'a>(&'a self, name: &str) -> Option<&'a dyn State> {
+            match name {
+                "child1" => Some(&self.child1),
+                "child2" => Some(&self.child2),
+                _ => None,
+            }
+        }
+
+        fn state_mut<'a>(&'a mut self, name: &str) -> Option<&'a mut dyn State> {
+            match name {
+                "child1" => Some(&mut self.child1),
+                "child2" => Some(&mut self.child2),
+                _ => None,
+            }
+        }
+
+        fn as_any_ref(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
         }
     }
 
-    /// Inserts a new state.
-    pub fn insert(&mut self, id: StateId, state: impl Any + 'static) -> Option<Box<dyn Any>> {
-        self.states
-            .insert(id, StateCell::new(state))
-            .map(|cell| cell.value)
+    #[derive(Eq, PartialEq, Debug)]
+    struct Child {
+        value: i32,
+        leaf: Leaf,
     }
 
-    /// Removes an existing.
-    pub fn remove(&mut self, id: &StateId) -> Option<Box<dyn Any>> {
-        self.states.remove(&id).map(|cell| cell.value)
-    }
+    impl State for Child {
+        fn state<'a>(&'a self, name: &str) -> Option<&'a dyn State> {
+            match name {
+                "leaf" => Some(&self.leaf),
+                _ => None,
+            }
+        }
 
-    /// Gets a state. 
-    pub fn get(&self, id: &StateId) -> Option<&dyn Any> {
-        self.states
-            .get(id)
-            .map(|cell| cell.value.as_ref())
-    }
-
-    /// Mutably gets a state cell by id, triggering change detection.
-    pub fn get_mut(&mut self, id: &StateId) -> Option<&mut dyn Any> {
-        let cell = self.states.get_mut(id)?;
-        cell.changed = true;
-        Some(&mut cell.value)
-        
-    }
-
-    pub fn len(&self) -> usize {
-        self.states.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.states.is_empty()
-    }
-
-    pub fn detect_changes<F>(&mut self, mut handle: F) 
-    where
-        F: FnMut(&StateId, &dyn Any),
-    {
-        for (state_id, state_cell) in &mut self.states {
-            if !state_cell.changed { continue };
-            handle(state_id, &state_cell.value);
-            state_cell.changed = false;
+        fn state_mut<'a>(&'a mut self, name: &str) -> Option<&'a mut dyn State> {
+            match name {
+                "leaf" => Some(&mut self.leaf),
+                _ => None,
+            }
+        }
+        fn as_any_ref(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
         }
     }
-}
 
-/// Stores a single state object.
-/// Tracks changes. 
-struct StateCell {
-    value: Box<dyn Any>,
-    changed: bool,
-}
-
-impl StateCell {
-    fn new(value: impl Any) -> Self {
-        Self {
-            value: Box::new(value),
-            changed: true,
+    #[derive(Eq, PartialEq, Debug)]
+    struct Leaf {
+        value: i32,
+    }
+    impl State for Leaf {
+        fn as_any_ref(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
         }
     }
-}
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct StateId(SmallVec::<[u16; 4]>);
-impl StateId {
-    fn child(&self, child_id: u16) -> Self {
-        let mut id = self.0.clone();
-        id.push(child_id);
-        Self(id)
+    #[test]
+    fn test_query_state() {
+        let parent = Parent {
+            value: 1,
+            child1: Child {
+                value: 2,
+                leaf: Leaf { value: 3 },
+            },
+            child2: Child {
+                value: 4,
+                leaf: Leaf { value: 5 },
+            },
+        };
+        let par = query_state::<Parent>(&parent, &[]);
+        let ch1 = query_state::<Child>(&parent, &["child1"]);
+        let ch2 = query_state::<Child>(&parent, &["child2"]);
+        let lf1 = query_state::<Leaf>(&parent, &["child1", "leaf"]);
+        let lf2 = query_state::<Leaf>(&parent, &["child2", "leaf"]);
+        let none_a = query_state::<Leaf>(&parent, &["none", "leaf"]);
+        let none_b = query_state::<Leaf>(&parent, &["child1", "none"]);
+        let none_wrong_type = query_state::<Leaf>(&parent, &["child1"]);
+        assert_eq!(par, Some(&parent));
+        assert_eq!(ch1, Some(&parent.child1));
+        assert_eq!(ch2, Some(&parent.child2));
+        assert_eq!(lf1, Some(&parent.child1.leaf));
+        assert_eq!(lf2, Some(&parent.child2.leaf));
+        assert_eq!(none_a, None);
+        assert_eq!(none_b, None);
+        assert_eq!(none_wrong_type, None);
     }
 }
-
-impl From<u16> for StateId {
-    fn from(value: u16) -> Self {
-        Self(smallvec![value])
-    }
-}
-
-impl From<&[u16]> for StateId {
-    fn from(value: &[u16]) -> Self {
-        Self(SmallVec::from_slice(value))
-    }
-}
-
