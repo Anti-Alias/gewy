@@ -10,7 +10,6 @@ pub trait App {
     /// Called when application first starts.
     /// Generally, initial window(s) will be created here.
     fn start(&mut self, _ctx: AppCtx) {}
-
     /// Cleanup logic for when application exits.
     fn exit(&mut self, _ctx: AppCtx) {}
 }
@@ -27,9 +26,9 @@ pub fn run_app(app: impl App) {
 /// Wraps an [`App`], and forwards winit events to it. 
 struct AppHandler<A: App> {
     app: A,
+    windows: Vec<Window>,
     context: RenderContext,
     started: bool,
-    windows: Vec<Window>,
     proxy: EventLoopProxy<AppEvent>,
 }
 
@@ -55,10 +54,14 @@ impl<A: App> AppHandler<A> {
     }
 
     // Handles key events on a focused window 
-    fn key_event(&mut self, event: KeyEvent, event_loop: &ActiveEventLoop) {
+    fn key_event(&mut self, event: KeyEvent, window_id: WindowId) {
         if event.state != ElementState::Pressed { return };
         match event.physical_key {
-            PhysicalKey::Code(KeyCode::KeyQ) => event_loop.exit(),
+            PhysicalKey::Code(KeyCode::KeyQ) => {
+                self.proxy
+                    .send_event(AppEvent::CloseWindow(window_id))
+                    .unwrap();
+            },
             _ => {},
         }
     }
@@ -69,23 +72,22 @@ impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if !self.started {
             self.start(event_loop);
-        } else {
+        }
+        else {
             self.resume(event_loop);
         }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, _event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         match event {
-
-            WindowEvent::KeyboardInput { event, .. } => self.key_event(event, event_loop),
-
-            WindowEvent::CloseRequested => {
-                self.windows.retain(|window| window.id() != window_id);
-                if self.windows.is_empty() {
-                    event_loop.exit();
-                }
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.key_event(event, window_id);
             }
-
+            WindowEvent::CloseRequested => {
+                self.proxy
+                    .send_event(AppEvent::CloseWindow(window_id))
+                    .unwrap();
+            }
             WindowEvent::RedrawRequested => {
                 log::trace!("Redrawing");
                 let window = self
@@ -95,7 +97,6 @@ impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
                 let Some(window) = window else { return };
                 window.redraw(&self.context);
             }
-
             WindowEvent::Resized(size) => {
                 log::trace!("Resized");
                 let window = self
@@ -105,14 +106,21 @@ impl<A: App> ApplicationHandler<AppEvent> for AppHandler<A> {
                 let Some(window) = window else { return };
                 window.resize(size.width, size.height, &self.context);
             }
-
-            _ => {},
+            _ => {}
         }
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
         match event {
-            AppEvent::Exit => event_loop.exit(),
+            AppEvent::Exit => {
+                event_loop.exit();
+            }
+            AppEvent::CloseWindow(window_id) => {
+                self.windows.retain(|window| window.id() != window_id);
+                if self.windows.is_empty() {
+                    event_loop.exit();
+                }
+            }
         }
     }
 
@@ -166,7 +174,6 @@ impl<'a> AppCtx<'a> {
         self.windows.iter().find(|window| window.id() == id)
     }
 
-
     /// Requests that the application close.
     pub fn exit(&mut self) {
         self.event_loop.exit();
@@ -174,4 +181,7 @@ impl<'a> AppCtx<'a> {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum AppEvent { Exit }
+pub enum AppEvent {
+    CloseWindow(WindowId),
+    Exit,
+}

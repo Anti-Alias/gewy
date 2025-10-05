@@ -4,10 +4,12 @@ struct Handler;
 impl App for Handler {
     fn start(&mut self, mut ctx: AppCtx) {
         log::info!("Started!!!");
-        let attr = WindowAttributes::default()
-            .with_title("Window")
-            .with_inner_size(LogicalSize::new(512, 512));
-        ctx.create_window(attr);
+        for _ in 0..1 {
+            let attr = WindowAttributes::default()
+                .with_title("Window")
+                .with_inner_size(LogicalSize::new(512, 512));
+            ctx.create_window(attr);
+        }
     }
 
     fn exit(&mut self, _ctx: AppCtx) {
@@ -22,16 +24,19 @@ fn main() {
 
 #[derive(State)]
 struct Dog {
-    #[state]
-    sub_a: SubState,
-    #[state]
-    sub_b: SubState,
-    #[state]
-    sub_c: SubState,
+    #[value]
+    wags: i32,
+    #[child]
+    child_a: SubState,
+    #[child]
+    child_b: SubState,
+    #[child]
+    child_c: SubState,
 }
 
 
 #[derive(State)]
 struct SubState {
+    #[value]
     value: i32,
 }

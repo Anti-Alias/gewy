@@ -12,8 +12,8 @@ const CLEAR_COLOR: vello::peniko::Color = vello::peniko::Color::from_rgba8(100, 
 
 pub struct Window {
     // Vello
-    renderer: Renderer,
     surface: RenderSurface<'static>,
+    renderer: Renderer,
     scene: Scene,
     // Winit
     window: Arc<WinitWindow>,
